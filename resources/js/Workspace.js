@@ -1,13 +1,20 @@
-export default class Collaborator {
+export default class Workspace {
 
-    constructor() {
+    constructor(container) {
+        this.container = container;
+        this.echo = null;
+        this.started = false;
+
         this.debouncedBroadcastValueChange = _.debounce(function (payload) {
             this.broadcastValueChange(payload);
         }, 500);
     }
 
     start() {
-        if (this.echo && this.container) this.initializeEcho();
+        if (this.started) return;
+
+        this.initializeEcho();
+        this.started = true;
     }
 
     initializeEcho() {
@@ -54,5 +61,4 @@ export default class Collaborator {
     applyBroadcastedValueChange(payload) {
         Statamic.$store.dispatch(`publish/${this.container.name}/setValue`, payload);
     }
-
 }

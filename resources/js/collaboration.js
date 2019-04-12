@@ -1,13 +1,12 @@
-import Collaborator from './Collaborator';
-const collaborator = new Collaborator;
+import Manager from './Manager';
+const manager = new Manager;
 
 Statamic.$echo.booted(Echo => {
-    collaborator.echo = Echo;
-    collaborator.start();
+    manager.echo = Echo;
+    manager.boot();
 });
 
 Statamic.$events.$on('publish-container-created', container => {
-    collaborator.container = container;
-    collaborator.start();
+    manager.addWorkspace(container);
 });
 
