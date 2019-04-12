@@ -4,6 +4,7 @@ export default class Workspace {
         this.container = container;
         this.echo = null;
         this.started = false;
+        this.storeSubscriber = null;
 
         this.debouncedBroadcastValueChange = _.debounce(function (payload) {
             this.broadcastValueChange(payload);
@@ -17,11 +18,15 @@ export default class Workspace {
         this.started = true;
     }
 
+    destroy() {
+        this.storeSubscriber.apply();
+        this.echo.leave(this.channelName);
+    }
+
     initializeEcho() {
         const reference = this.container.reference.replace('::', '.');
-        const name = `${reference}.${this.container.site}`;
-
-        this.channel = this.echo.join(name);
+        this.channelName = `${reference}.${this.container.site}`;
+        this.channel = this.echo.join(this.channelName);
 
         this.channel.here(users => {
             this.subscribeToVuexMutations();
@@ -43,7 +48,7 @@ export default class Workspace {
     }
 
     subscribeToVuexMutations() {
-        Statamic.$store.subscribe((mutation, state) => {
+        this.storeSubscriber = Statamic.$store.subscribe((mutation, state) => {
             if (mutation.type === `publish/${this.container.name}/setValue`) {
                 this.debouncedBroadcastValueChange(mutation.payload);
             }

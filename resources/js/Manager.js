@@ -4,13 +4,13 @@ export default class Manager {
 
     constructor() {
         this.echo = null;
-        this.workspaces = [];
+        this.workspaces = {};
     }
 
     boot() {
         if (! this.echo) return;
 
-        this.workspaces.forEach(workspace => {
+        Object.values(this.workspaces).forEach(workspace => {
             workspace.echo = this.echo;
             workspace.start();
         });
@@ -18,8 +18,13 @@ export default class Manager {
 
     addWorkspace(container) {
         const workspace = new Workspace(container);
-        this.workspaces.push(workspace);
+        this.workspaces[container.name] = workspace;
         this.boot();
+    }
+
+    destroyWorkspace(container) {
+        this.workspaces[container.name].destroy();
+        delete this.workspaces[container.name];
     }
 
 }
