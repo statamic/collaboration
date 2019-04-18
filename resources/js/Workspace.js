@@ -17,6 +17,7 @@ export default class Workspace {
 
         this.initializeEcho();
         this.initializeStore();
+        this.initializeFocus();
         this.container.pushComponent({
             name: 'CollaborationAvatars',
             props: {
@@ -54,13 +55,19 @@ export default class Workspace {
         this.channel.listenForWhisper('updated', e => {
             this.applyBroadcastedValueChange(e);
         });
+
+        this.channel.listenForWhisper('focus', ({ user, handle }) => {
+            this.debug(`Heard that user has changed focus`, { user, handle });
+            this.setFocus(user, handle);
+        });
     }
 
     initializeStore() {
         Statamic.$store.registerModule(['collaboration', this.channelName], {
             namespaced: true,
             state: {
-                users: []
+                users: [],
+                focus: {},
             },
             mutations: {
                 setUsers(state, users) {
@@ -71,9 +78,24 @@ export default class Workspace {
                 },
                 removeUser(state, removedUser) {
                     state.users = state.users.filter(user => user.id !== removedUser.id);
+                },
+                setFocus(state, { handle, user }) {
+                    state.focus = Object.assign({}, state.focus, { [user]: handle });
                 }
             }
         });
+    }
+
+    initializeFocus() {
+        this.container.$on('focus', handle => {
+            const user = Statamic.$config.get('userId');
+            this.setFocus(user, handle);
+            this.channel.whisper('focus', { user, handle });
+        });
+    }
+
+    setFocus(user, handle) {
+        Statamic.$store.commit(`collaboration/${this.channelName}/setFocus`, { user, handle });
     }
 
     subscribeToVuexMutations() {
