@@ -16,6 +16,7 @@ export default class Workspace {
         if (this.started) return;
 
         this.initializeEcho();
+        this.initializeStore();
         this.started = true;
     }
 
@@ -31,20 +32,41 @@ export default class Workspace {
 
         this.channel.here(users => {
             this.subscribeToVuexMutations();
-            const names = users.map(user => user.name).join(' ');
-            Statamic.$notify.success(`Users here: ${names}`);
+            Statamic.$store.commit(`collaboration/${this.channelName}/setUsers`, users);
         });
 
         this.channel.joining(user => {
+            Statamic.$store.commit(`collaboration/${this.channelName}/addUser`, user);
             Statamic.$notify.success(`${user.name} has joined.`);
         });
 
         this.channel.leaving(user => {
+            Statamic.$store.commit(`collaboration/${this.channelName}/removeUser`, user);
             Statamic.$notify.success(`${user.name} has left.`);
         });
 
         this.channel.listenForWhisper('updated', e => {
             this.applyBroadcastedValueChange(e);
+        });
+    }
+
+    initializeStore() {
+        Statamic.$store.registerModule(['collaboration', this.channelName], {
+            namespaced: true,
+            state: {
+                users: []
+            },
+            mutations: {
+                setUsers(state, users) {
+                    state.users = users;
+                },
+                addUser(state, user) {
+                    state.users.push(user);
+                },
+                removeUser(state, removedUser) {
+                    state.users = state.users.filter(user => user.id !== removedUser.id);
+                }
+            }
         });
     }
 
