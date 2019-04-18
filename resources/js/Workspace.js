@@ -17,6 +17,12 @@ export default class Workspace {
 
         this.initializeEcho();
         this.initializeStore();
+        this.container.pushComponent({
+            name: 'CollaborationAvatars',
+            props: {
+                channelName: this.channelName,
+            }
+        });
         this.started = true;
     }
 
