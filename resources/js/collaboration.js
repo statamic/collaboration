@@ -2,7 +2,7 @@ import Manager from './Manager';
 const manager = new Manager;
 
 Statamic.booting(() => {
-    Statamic.component('CollaborationAvatars', require('./Avatars.vue'));
+    Statamic.component('CollaborationStatusBar', require('./StatusBar.vue'));
 
     Statamic.$store.registerModule('collaboration', {
         namespaced: true

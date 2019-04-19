@@ -1,7 +1,8 @@
 <template>
 
-    <div>
-        <div v-if="users.length > 1" class="flex items-center -mt-2 mb-3">
+    <div :class="{ '-mt-2 mb-2': connecting || users.length > 1 }">
+        <loading-graphic v-if="connecting" :inline="true" :size="16" text="Attempting websocket connection..." />
+        <div v-if="users.length > 1" class="flex items-center">
             <div
                 v-for="user in users"
                 :key="user.id"
@@ -33,6 +34,9 @@ export default {
         users() {
             return this.$store.state.collaboration[this.channelName].users;
         },
+        connecting() {
+            return this.users.length === 0;
+        }
     }
 
 }

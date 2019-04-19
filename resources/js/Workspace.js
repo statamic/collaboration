@@ -20,9 +20,10 @@ export default class Workspace {
         this.initializeStore();
         this.initializeFocus();
         this.container.pushComponent({
-            name: 'CollaborationAvatars',
+            name: 'CollaborationStatusBar',
             props: {
                 channelName: this.channelName,
+                connecting: this.connecting,
             }
         });
         this.started = true;
