@@ -1,15 +1,16 @@
 <template>
 
-    <div class="flex items-center">
-        <div
-            v-for="user in users"
-            :key="user.id"
-        >
-            <avatar
-                :user="user"
-                class="mr-1"
-            />
-            {{ focusedField(user.id) || 'nowhere yet' }}
+    <div>
+        <div v-if="users.length > 1" class="flex items-center -mt-2 mb-3">
+            <div
+                v-for="user in users"
+                :key="user.id"
+            >
+                <avatar
+                    :user="user"
+                    class="rounded-full w-6 mr-1"
+                />
+            </div>
         </div>
     </div>
 
@@ -32,14 +33,6 @@ export default {
         users() {
             return this.$store.state.collaboration[this.channelName].users;
         },
-    },
-
-    methods: {
-
-        focusedField(user) {
-            return this.$store.state.collaboration[this.channelName].focus[user] || null;
-        }
-
     }
 
 }
