@@ -102,12 +102,12 @@ export default class Workspace {
         this.container.$on('focus', handle => {
             const user = Statamic.$config.get('userId');
             this.focus(user, handle);
-            this.channel.whisper('focus', { user, handle });
+            this.whisper('focus', { user, handle });
         });
         this.container.$on('blur', handle => {
             const user = Statamic.$config.get('userId');
             this.blur(user, handle);
-            this.channel.whisper('blur', { user, handle });
+            this.whisper('blur', { user, handle });
         });
     }
 
@@ -157,8 +157,7 @@ export default class Workspace {
         // Only my own change events should be broadcasted. Otherwise when other users receive
         // the broadcast, it will be re-broadcasted, and so on, to infinity and beyond.
         if (Statamic.$config.get('userId') == payload.user) {
-            this.debug('📣 Broadcasting', payload);
-            this.channel.whisper('updated', payload);
+            this.whisper('updated', payload);
         }
     }
 
@@ -169,5 +168,16 @@ export default class Workspace {
 
     debug(message, args) {
         console.log('[Collaboration]', message, {...args});
+    }
+
+    isAlone() {
+        return Statamic.$store.state.collaboration[this.channelName].users.length === 1;
+    }
+
+    whisper(event, payload) {
+        if (this.isAlone()) return;
+
+        this.debug(`📣 Broadcasting "${event}"`, payload);
+        this.channel.whisper(event, payload);
     }
 }
