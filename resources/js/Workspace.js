@@ -98,10 +98,10 @@ export default class Workspace {
                     state.users = state.users.filter(user => user.id !== removedUser.id);
                 },
                 focus(state, { handle, user }) {
-                    Vue.set(state.focus, user, handle);
+                    Vue.set(state.focus, user.id, handle);
                 },
                 blur(state, user) {
-                    Vue.delete(state.focus, user);
+                    Vue.delete(state.focus, user.id);
                 }
             }
         });
