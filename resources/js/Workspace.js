@@ -54,6 +54,7 @@ export default class Workspace {
         this.channel.leaving(user => {
             Statamic.$store.commit(`collaboration/${this.channelName}/removeUser`, user);
             Statamic.$notify.success(`${user.name} has left.`);
+            this.blurAndUnlock(user);
         });
 
         this.channel.listenForWhisper('updated', e => {
@@ -69,14 +70,12 @@ export default class Workspace {
 
         this.channel.listenForWhisper('focus', ({ user, handle }) => {
             this.debug(`Heard that user has changed focus`, { user, handle });
-            this.focus(user, handle);
-            Statamic.$store.commit(`publish/${this.container.name}/lockField`, { user, handle });
+            this.focusAndLock(user, handle);
         });
 
         this.channel.listenForWhisper('blur', ({ user, handle }) => {
             this.debug(`Heard that user has blurred`, { user, handle });
-            this.blur(user);
-            Statamic.$store.commit(`publish/${this.container.name}/unlockField`, handle);
+            this.blurAndUnlock(user, handle);
         });
     }
 
@@ -124,8 +123,19 @@ export default class Workspace {
         Statamic.$store.commit(`collaboration/${this.channelName}/focus`, { user, handle });
     }
 
+    focusAndLock(user, handle) {
+        this.focus(user, handle);
+        Statamic.$store.commit(`publish/${this.container.name}/lockField`, { user, handle });
+    }
+
     blur(user) {
         Statamic.$store.commit(`collaboration/${this.channelName}/blur`, user);
+    }
+
+    blurAndUnlock(user, handle = null) {
+        handle = handle || Statamic.$store.state.collaboration[this.channelName].focus[user.id];
+        this.blur(user);
+        Statamic.$store.commit(`publish/${this.container.name}/unlockField`, handle);
     }
 
     subscribeToVuexMutations() {
