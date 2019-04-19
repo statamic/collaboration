@@ -7,6 +7,7 @@ export default class Workspace {
         this.storeSubscriber = null;
         this.lastValues = {};
         this.user = Statamic.user;
+        this.initialStateUpdated = false;
 
         this.debouncedBroadcastValueChange = _.debounce(function (payload) {
             this.broadcastValueChange(payload);
@@ -47,8 +48,7 @@ export default class Workspace {
         this.channel.joining(user => {
             Statamic.$store.commit(`collaboration/${this.channelName}/addUser`, user);
             Statamic.$notify.success(`${user.name} has joined.`);
-
-            // todo: send the whole state to the new person
+            this.whisper(`initialize-state-for-${user.id}`, Statamic.$store.state.publish[this.container.name].values);
         });
 
         this.channel.leaving(user => {
@@ -58,6 +58,13 @@ export default class Workspace {
 
         this.channel.listenForWhisper('updated', e => {
             this.applyBroadcastedValueChange(e);
+        });
+
+        this.channel.listenForWhisper(`initialize-state-for-${this.user.id}`, payload => {
+            if (this.initialStateUpdated) return;
+            this.debug('✅ Applying broadcasted state change', payload);
+            Statamic.$store.dispatch(`publish/${this.container.name}/setValues`, payload);
+            this.initialStateUpdated = true;
         });
 
         this.channel.listenForWhisper('focus', ({ user, handle }) => {
