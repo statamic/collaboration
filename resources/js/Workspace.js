@@ -49,12 +49,14 @@ export default class Workspace {
             Statamic.$store.commit(`collaboration/${this.channelName}/addUser`, user);
             Statamic.$notify.success(`${user.name} has joined.`);
             this.whisper(`initialize-state-for-${user.id}`, Statamic.$store.state.publish[this.container.name].values);
+            this.playAudio('buddy-in');
         });
 
         this.channel.leaving(user => {
             Statamic.$store.commit(`collaboration/${this.channelName}/removeUser`, user);
             Statamic.$notify.success(`${user.name} has left.`);
             this.blurAndUnlock(user);
+            this.playAudio('buddy-out');
         });
 
         this.channel.listenForWhisper('updated', e => {
@@ -198,5 +200,13 @@ export default class Workspace {
 
         this.debug(`📣 Broadcasting "${event}"`, payload);
         this.channel.whisper(event, payload);
+    }
+
+    playAudio(file) {
+        let el = document.createElement('audio');
+        el.src = cp_url(`../vendor/statamic/collaboration/audio/${file}.mp3`);
+        document.body.appendChild(el);
+        el.addEventListener('ended', () => el.remove());
+        el.play();
     }
 }
