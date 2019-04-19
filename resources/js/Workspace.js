@@ -6,6 +6,7 @@ export default class Workspace {
         this.started = false;
         this.storeSubscriber = null;
         this.lastValues = {};
+        this.user = Statamic.user;
 
         this.debouncedBroadcastValueChange = _.debounce(function (payload) {
             this.broadcastValueChange(payload);
@@ -100,12 +101,12 @@ export default class Workspace {
 
     initializeFocus() {
         this.container.$on('focus', handle => {
-            const user = Statamic.$config.get('userId');
+            const user = this.user;
             this.focus(user, handle);
             this.whisper('focus', { user, handle });
         });
         this.container.$on('blur', handle => {
-            const user = Statamic.$config.get('userId');
+            const user = this.user;
             this.blur(user, handle);
             this.whisper('blur', { user, handle });
         });
@@ -156,7 +157,7 @@ export default class Workspace {
     broadcastValueChange(payload) {
         // Only my own change events should be broadcasted. Otherwise when other users receive
         // the broadcast, it will be re-broadcasted, and so on, to infinity and beyond.
-        if (Statamic.$config.get('userId') == payload.user) {
+        if (this.user.id == payload.user) {
             this.whisper('updated', payload);
         }
     }
