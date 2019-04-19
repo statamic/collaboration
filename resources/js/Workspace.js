@@ -45,6 +45,8 @@ export default class Workspace {
         this.channel.joining(user => {
             Statamic.$store.commit(`collaboration/${this.channelName}/addUser`, user);
             Statamic.$notify.success(`${user.name} has joined.`);
+
+            // todo: send the whole state to the new person
         });
 
         this.channel.leaving(user => {
@@ -58,7 +60,14 @@ export default class Workspace {
 
         this.channel.listenForWhisper('focus', ({ user, handle }) => {
             this.debug(`Heard that user has changed focus`, { user, handle });
-            this.setFocus(user, handle);
+            this.focus(user, handle);
+            Statamic.$store.commit(`publish/${this.container.name}/lockField`, { user, handle });
+        });
+
+        this.channel.listenForWhisper('blur', ({ user, handle }) => {
+            this.debug(`Heard that user has blurred`, { user, handle });
+            this.blur(user);
+            Statamic.$store.commit(`publish/${this.container.name}/unlockField`, handle);
         });
     }
 
@@ -79,8 +88,11 @@ export default class Workspace {
                 removeUser(state, removedUser) {
                     state.users = state.users.filter(user => user.id !== removedUser.id);
                 },
-                setFocus(state, { handle, user }) {
-                    state.focus = Object.assign({}, state.focus, { [user]: handle });
+                focus(state, { handle, user }) {
+                    Vue.set(state.focus, user, handle);
+                },
+                blur(state, user) {
+                    Vue.delete(state.focus, user);
                 }
             }
         });
@@ -89,13 +101,22 @@ export default class Workspace {
     initializeFocus() {
         this.container.$on('focus', handle => {
             const user = Statamic.$config.get('userId');
-            this.setFocus(user, handle);
+            this.focus(user, handle);
             this.channel.whisper('focus', { user, handle });
+        });
+        this.container.$on('blur', handle => {
+            const user = Statamic.$config.get('userId');
+            this.blur(user, handle);
+            this.channel.whisper('blur', { user, handle });
         });
     }
 
-    setFocus(user, handle) {
-        Statamic.$store.commit(`collaboration/${this.channelName}/setFocus`, { user, handle });
+    focus(user, handle) {
+        Statamic.$store.commit(`collaboration/${this.channelName}/focus`, { user, handle });
+    }
+
+    blur(user) {
+        Statamic.$store.commit(`collaboration/${this.channelName}/blur`, user);
     }
 
     subscribeToVuexMutations() {
