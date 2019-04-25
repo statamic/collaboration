@@ -48,7 +48,10 @@ export default class Workspace {
         this.channel.joining(user => {
             Statamic.$store.commit(`collaboration/${this.channelName}/addUser`, user);
             Statamic.$notify.success(`${user.name} has joined.`);
-            this.whisper(`initialize-state-for-${user.id}`, Statamic.$store.state.publish[this.container.name].values);
+            this.whisper(`initialize-state-for-${user.id}`, {
+                values: Statamic.$store.state.publish[this.container.name].values,
+                focus: Statamic.$store.state.collaboration[this.channelName].focus,
+            });
             this.playAudio('buddy-in');
         });
 
@@ -66,7 +69,8 @@ export default class Workspace {
         this.channel.listenForWhisper(`initialize-state-for-${this.user.id}`, payload => {
             if (this.initialStateUpdated) return;
             this.debug('✅ Applying broadcasted state change', payload);
-            Statamic.$store.dispatch(`publish/${this.container.name}/setValues`, payload);
+            Statamic.$store.dispatch(`publish/${this.container.name}/setValues`, payload.values);
+            _.each(payload.focus, ({ user, handle }) => this.focusAndLock(user, handle));
             this.initialStateUpdated = true;
         });
 
@@ -99,7 +103,7 @@ export default class Workspace {
                     state.users = state.users.filter(user => user.id !== removedUser.id);
                 },
                 focus(state, { handle, user }) {
-                    Vue.set(state.focus, user.id, handle);
+                    Vue.set(state.focus, user.id, { handle, user });
                 },
                 blur(state, user) {
                     Vue.delete(state.focus, user.id);
@@ -135,7 +139,8 @@ export default class Workspace {
     }
 
     blurAndUnlock(user, handle = null) {
-        handle = handle || Statamic.$store.state.collaboration[this.channelName].focus[user.id];
+        handle = handle || data_get(Statamic.$store.state.collaboration[this.channelName], `focus.${user.id}.handle`);
+        if (!handle) return;
         this.blur(user);
         Statamic.$store.commit(`publish/${this.container.name}/unlockField`, handle);
     }
