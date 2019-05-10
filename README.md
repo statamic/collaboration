@@ -21,10 +21,11 @@ Clone the Github repo somewhere, then add it to your `composer.json`'s `reposito
 ]
 ```
 
-Require it using Composer:
+Require it using Composer, as well as the Pusher library.
 
 ```
 composer require statamic/collaboration
+composer require pusher/pusher-php-server "~3.0"
 ```
 
 Uncomment `BroadcastServiceProvider` from `config/app.php`'s `providers` array if it isn't already.
@@ -40,6 +41,8 @@ Uncomment `BroadcastServiceProvider` from `config/app.php`'s `providers` array i
 Make sure your Pusher credentials are added to `.env`:
 
 ```
+BROADCAST_DRIVER=pusher
+
 PUSHER_APP_ID=
 PUSHER_APP_KEY=
 PUSHER_APP_SECRET=
