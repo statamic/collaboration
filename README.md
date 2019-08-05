@@ -48,3 +48,9 @@ PUSHER_APP_KEY=
 PUSHER_APP_SECRET=
 PUSHER_APP_CLUSTER=
 ```
+
+Publish the assets:
+
+```
+php artisan vendor:publish --provider="Statamic\Collaboration\ServiceProvider"
+```
