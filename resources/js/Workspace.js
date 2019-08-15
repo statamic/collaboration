@@ -148,7 +148,7 @@ export default class Workspace {
     subscribeToVuexMutations() {
         this.storeSubscriber = Statamic.$store.subscribe((mutation, state) => {
             switch (mutation.type) {
-                case `publish/${this.container.name}/setValue`:
+                case `publish/${this.container.name}/setFieldValue`:
                     this.vuexValueHasBeenSet(mutation.payload);
             }
         });
@@ -189,7 +189,7 @@ export default class Workspace {
 
     applyBroadcastedValueChange(payload) {
         this.debug('✅ Applying broadcasted change', payload);
-        Statamic.$store.dispatch(`publish/${this.container.name}/setValue`, payload);
+        Statamic.$store.dispatch(`publish/${this.container.name}/setFieldValue`, payload);
     }
 
     debug(message, args) {
