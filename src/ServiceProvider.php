@@ -8,6 +8,7 @@ use Statamic\Extend\ServiceProvider as BaseProvider;
 class ServiceProvider extends BaseProvider
 {
     protected $scripts = [__DIR__.'/../dist/js/collaboration.js'];
+    protected $publishables = [__DIR__.'/../dist/audio' => 'audio'];
 
     public function boot()
     {
