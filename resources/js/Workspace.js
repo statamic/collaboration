@@ -20,13 +20,7 @@ export default class Workspace {
         this.initializeEcho();
         this.initializeStore();
         this.initializeFocus();
-        this.container.pushComponent({
-            name: 'CollaborationStatusBar',
-            props: {
-                channelName: this.channelName,
-                connecting: this.connecting,
-            }
-        });
+        this.initializeStatusBar();
         this.started = true;
     }
 
@@ -83,6 +77,17 @@ export default class Workspace {
             this.debug(`Heard that user has blurred`, { user, handle });
             this.blurAndUnlock(user, handle);
         });
+
+        this.channel.listenForWhisper('force-unlock', ({ targetUser, originUser }) => {
+            this.debug(`Heard that user has requested another be unlocked`, { targetUser, originUser });
+
+            if (targetUser.id !== this.user.id) return;
+
+            document.activeElement.blur();
+            this.blurAndUnlock(this.user);
+            this.whisper('blur', { user: this.user });
+            Statamic.$notify.info(`${originUser.name} has unlocked your editor.`, { duration: false });
+        });
     }
 
     initializeStore() {
@@ -109,6 +114,19 @@ export default class Workspace {
                     Vue.delete(state.focus, user.id);
                 }
             }
+        });
+    }
+
+    initializeStatusBar() {
+        const component = this.container.pushComponent('CollaborationStatusBar', {
+            props: {
+                channelName: this.channelName,
+                connecting: this.connecting,
+            }
+        });
+
+        component.on('unlock', (targetUser) => {
+            this.whisper('force-unlock', { targetUser, originUser: this.user });
         });
     }
 
