@@ -20,6 +20,7 @@ export default class Workspace {
         this.initializeEcho();
         this.initializeStore();
         this.initializeFocus();
+        this.initializeHooks();
         this.initializeStatusBar();
         this.started = true;
     }
@@ -88,6 +89,10 @@ export default class Workspace {
             this.whisper('blur', { user: this.user });
             Statamic.$notify.info(`${originUser.name} has unlocked your editor.`, { duration: false });
         });
+
+        this.channel.listenForWhisper('saved', ({ user }) => {
+            Statamic.$notify.success(`Saved by ${user.name}.`);
+        });
     }
 
     initializeStore() {
@@ -127,6 +132,15 @@ export default class Workspace {
 
         component.on('unlock', (targetUser) => {
             this.whisper('force-unlock', { targetUser, originUser: this.user });
+        });
+    }
+
+    initializeHooks() {
+        Statamic.$hooks.on('entry.saved', (resolve, reject, { reference }) => {
+            if (reference === this.container.reference) {
+                this.whisper('saved', { user: this.user });
+            }
+            resolve();
         });
     }
 
