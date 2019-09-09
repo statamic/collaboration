@@ -93,6 +93,25 @@ export default class Workspace {
         this.channel.listenForWhisper('saved', ({ user }) => {
             Statamic.$notify.success(`Saved by ${user.name}.`);
         });
+
+        this.channel.listenForWhisper('published', ({ user, message }) => {
+            Statamic.$notify.success(`Published by ${user.name}.`);
+            const messageProp = message
+                ? `Entry has been published by ${user.name} with the message: ${message}`
+                : `Entry has been published by ${user.name} with no message.`
+            Statamic.$components.append('CollaborationBlockingNotification', {
+                props: { message: messageProp }
+            }).on('confirm', () => window.location.reload());
+            this.destroy(); // Stop listening to anything else.
+        });
+
+        this.channel.listenForWhisper('revision-restored', ({ user }) => {
+            Statamic.$notify.success(`Revision restored by ${user.name}.`);
+            Statamic.$components.append('CollaborationBlockingNotification', {
+                props: { message: `Entry has been restored to another revision by ${user.name}` }
+            }).on('confirm', () => window.location.reload());
+            this.destroy(); // Stop listening to anything else.
+        });
     }
 
     initializeStore() {
@@ -141,6 +160,23 @@ export default class Workspace {
                 this.whisper('saved', { user: this.user });
             }
             resolve();
+        });
+
+        Statamic.$hooks.on('entry.published', (resolve, reject, { reference, message }) => {
+            if (reference === this.container.reference) {
+                this.whisper('published', { user: this.user, message });
+            }
+            resolve();
+        });
+
+        Statamic.$hooks.on('revision.restored', (resolve, reject, { reference }) => {
+            if (reference !== this.container.reference) return resolve();
+
+            this.whisper('revision-restored', { user: this.user });
+
+            // Echo doesn't give us a promise, so wait half a second before resolving.
+            // That should be enough time for the whisper to be sent before the the page refreshes.
+            setTimeout(resolve, 500);
         });
     }
 

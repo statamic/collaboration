@@ -3,6 +3,7 @@ const manager = new Manager;
 
 Statamic.booting(() => {
     Statamic.component('CollaborationStatusBar', require('./StatusBar.vue'));
+    Statamic.component('CollaborationBlockingNotification', require('./BlockingNotification.vue'));
 
     Statamic.$store.registerModule('collaboration', {
         namespaced: true
