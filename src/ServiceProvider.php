@@ -3,7 +3,7 @@
 namespace Statamic\Collaboration;
 
 use Illuminate\Support\Facades\Broadcast;
-use Statamic\Extend\ServiceProvider as BaseProvider;
+use Statamic\Providers\AddonServiceProvider as BaseProvider;
 
 class ServiceProvider extends BaseProvider
 {
