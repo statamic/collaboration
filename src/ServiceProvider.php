@@ -3,9 +3,9 @@
 namespace Statamic\Collaboration;
 
 use Illuminate\Support\Facades\Broadcast;
-use Statamic\Providers\AddonServiceProvider as BaseProvider;
+use Statamic\Providers\AddonServiceProvider;
 
-class ServiceProvider extends BaseProvider
+class ServiceProvider extends AddonServiceProvider
 {
     protected $scripts = [__DIR__.'/../dist/js/collaboration.js'];
     protected $publishables = [__DIR__.'/../dist/audio' => 'audio'];
