@@ -42,7 +42,7 @@ export default class Workspace {
 
         this.channel.joining(user => {
             Statamic.$store.commit(`collaboration/${this.channelName}/addUser`, user);
-            Statamic.$notify.success(`${user.name} has joined.`);
+            Statamic.$toast.success(`${user.name} has joined.`);
             this.whisper(`initialize-state-for-${user.id}`, {
                 values: Statamic.$store.state.publish[this.container.name].values,
                 focus: Statamic.$store.state.collaboration[this.channelName].focus,
@@ -52,7 +52,7 @@ export default class Workspace {
 
         this.channel.leaving(user => {
             Statamic.$store.commit(`collaboration/${this.channelName}/removeUser`, user);
-            Statamic.$notify.success(`${user.name} has left.`);
+            Statamic.$toast.success(`${user.name} has left.`);
             this.blurAndUnlock(user);
             this.playAudio('buddy-out');
         });
@@ -87,15 +87,15 @@ export default class Workspace {
             document.activeElement.blur();
             this.blurAndUnlock(this.user);
             this.whisper('blur', { user: this.user });
-            Statamic.$notify.info(`${originUser.name} has unlocked your editor.`, { duration: false });
+            Statamic.$toast.info(`${originUser.name} has unlocked your editor.`, { duration: false });
         });
 
         this.channel.listenForWhisper('saved', ({ user }) => {
-            Statamic.$notify.success(`Saved by ${user.name}.`);
+            Statamic.$toast.success(`Saved by ${user.name}.`);
         });
 
         this.channel.listenForWhisper('published', ({ user, message }) => {
-            Statamic.$notify.success(`Published by ${user.name}.`);
+            Statamic.$toast.success(`Published by ${user.name}.`);
             const messageProp = message
                 ? `Entry has been published by ${user.name} with the message: ${message}`
                 : `Entry has been published by ${user.name} with no message.`
@@ -106,7 +106,7 @@ export default class Workspace {
         });
 
         this.channel.listenForWhisper('revision-restored', ({ user }) => {
-            Statamic.$notify.success(`Revision restored by ${user.name}.`);
+            Statamic.$toast.success(`Revision restored by ${user.name}.`);
             Statamic.$components.append('CollaborationBlockingNotification', {
                 props: { message: `Entry has been restored to another revision by ${user.name}` }
             }).on('confirm', () => window.location.reload());
