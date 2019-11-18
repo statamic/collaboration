@@ -15,7 +15,7 @@ class ServiceProvider extends AddonServiceProvider
         parent::boot();
 
         Broadcast::channel('entry.{id}.{site}', function ($user, $id, $site) {
-            return $user->toArray();
+            return $user->augmentedArrayData();
         });
     }
 }
