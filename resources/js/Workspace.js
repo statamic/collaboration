@@ -38,6 +38,11 @@ export default class Workspace {
         this.channel.here(users => {
             this.subscribeToVuexMutations();
             Statamic.$store.commit(`collaboration/${this.channelName}/setUsers`, users);
+
+            Statamic.$hooks.run('user.set', {
+                collection: this.container.blueprint,
+                users: users,
+            });
         });
 
         this.channel.joining(user => {
