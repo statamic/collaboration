@@ -9,9 +9,7 @@ export default class Workspace {
         this.user = Statamic.user;
         this.initialStateUpdated = false;
 
-        this.debouncedBroadcastValueChange = _.debounce(function (payload) {
-            this.broadcastValueChange(payload);
-        }, 500);
+        this.debouncedBroadcastValueChangeFuncsByHandle = {};
     }
 
     start() {
@@ -234,12 +232,24 @@ export default class Workspace {
         }
 
         this.rememberValueChange(payload.handle, payload.value);
-        this.debouncedBroadcastValueChange(payload);
+        this.debouncedBroadcastValueChangeFuncByHandle(payload.handle)(payload);
     }
 
     rememberValueChange(handle, value) {
         this.debug('Remembering value change', { handle, value });
         this.lastValues[handle] = clone(value);
+    }
+
+    debouncedBroadcastValueChangeFuncByHandle(handle) {
+        // use existing debounced function if one already exists
+        const func = this.debouncedBroadcastValueChangeFuncsByHandle[handle];
+        if (func) return func;
+
+        // if the handle has no debounced broadcast function yet, create one and return it
+        this.debouncedBroadcastValueChangeFuncsByHandle[handle] = _.debounce((payload) => {
+            this.broadcastValueChange(payload);
+        }, 500);
+        return this.debouncedBroadcastValueChangeFuncsByHandle[handle];
     }
 
     valueHasChanged(handle, newValue) {
