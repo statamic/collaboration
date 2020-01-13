@@ -1,23 +1,25 @@
 {
     "name": "statamic/collaboration",
     "type": "statamic-addon",
-    "autoload": {
-        "psr-4": {
-            "Statamic\\Collaboration\\": "src"
-        }
-    },
+    "description": "Collaboration tools for Statamic 3",
+    "license": "proprietary",
     "require": {
         "statamic/cms": "^3.0.0-beta.10"
     },
     "extra": {
-        "statamic": {
-            "name": "Collaboration",
-            "description": "Collaboration addon"
-        },
         "laravel": {
             "providers": [
                 "Statamic\\Collaboration\\ServiceProvider"
             ]
+        },
+        "statamic": {
+            "name": "Collaboration",
+            "description": "Collaboration tools"
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Statamic\\Collaboration\\": "src"
         }
     }
 }
