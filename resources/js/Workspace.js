@@ -6,10 +6,12 @@ export default class Workspace {
         this.started = false;
         this.storeSubscriber = null;
         this.lastValues = {};
+        this.lastMetaValues = {};
         this.user = Statamic.user;
         this.initialStateUpdated = false;
 
         this.debouncedBroadcastValueChangeFuncsByHandle = {};
+        this.debouncedBroadcastMetaChangeFuncsByHandle = {};
     }
 
     start() {
@@ -43,6 +45,7 @@ export default class Workspace {
             Statamic.$toast.success(`${user.name} has joined.`);
             this.whisper(`initialize-state-for-${user.id}`, {
                 values: Statamic.$store.state.publish[this.container.name].values,
+                meta: Statamic.$store.state.publish[this.container.name].meta,
                 focus: Statamic.$store.state.collaboration[this.channelName].focus,
             });
             this.playAudio('buddy-in');
@@ -59,10 +62,15 @@ export default class Workspace {
             this.applyBroadcastedValueChange(e);
         });
 
+        this.channel.listenForWhisper('meta-updated', e => {
+            this.applyBroadcastedMetaChange(e);
+        });
+
         this.channel.listenForWhisper(`initialize-state-for-${this.user.id}`, payload => {
             if (this.initialStateUpdated) return;
             this.debug('✅ Applying broadcasted state change', payload);
             Statamic.$store.dispatch(`publish/${this.container.name}/setValues`, payload.values);
+            Statamic.$store.dispatch(`publish/${this.container.name}/setMeta`, payload.meta);
             _.each(payload.focus, ({ user, handle }) => this.focusAndLock(user, handle));
             this.initialStateUpdated = true;
         });
@@ -215,16 +223,20 @@ export default class Workspace {
         this.storeSubscriber = Statamic.$store.subscribe((mutation, state) => {
             switch (mutation.type) {
                 case `publish/${this.container.name}/setFieldValue`:
-                    this.vuexValueHasBeenSet(mutation.payload);
+                    this.vuexFieldValueHasBeenSet(mutation.payload);
+                    break;
+                case `publish/${this.container.name}/setFieldMeta`:
+                    this.vuexFieldMetaHasBeenSet(mutation.payload);
+                    break;
             }
         });
     }
 
-    // A value has been set in the vuex store.
+    // A field's value has been set in the vuex store.
     // It could have been triggered by the current user editing something,
     // or by the workspace applying a change dispatched by another user editing something.
-    vuexValueHasBeenSet(payload) {
-        this.debug('Vuex value has been set', payload);
+    vuexFieldValueHasBeenSet(payload) {
+        this.debug('Vuex field value has been set', payload);
         if (!this.valueHasChanged(payload.handle, payload.value)) {
             // No change? Don't bother doing anything.
             this.debug(`Value for ${payload.handle} has not changed.`, { value: payload.value, lastValue: this.lastValues[payload.handle] });
@@ -235,9 +247,29 @@ export default class Workspace {
         this.debouncedBroadcastValueChangeFuncByHandle(payload.handle)(payload);
     }
 
+    // A field's meta value has been set in the vuex store.
+    // It could have been triggered by the current user editing something,
+    // or by the workspace applying a change dispatched by another user editing something.
+    vuexFieldMetaHasBeenSet(payload) {
+        this.debug('Vuex field meta has been set', payload);
+        if (!this.metaHasChanged(payload.handle, payload.value)) {
+            // No change? Don't bother doing anything.
+            this.debug(`Meta for ${payload.handle} has not changed.`, { value: payload.value, lastValue: this.lastMetaValues[payload.handle] });
+            return;
+        }
+
+        this.rememberMetaChange(payload.handle, payload.value);
+        this.debouncedBroadcastMetaChangeFuncByHandle(payload.handle)(payload);
+    }
+
     rememberValueChange(handle, value) {
         this.debug('Remembering value change', { handle, value });
         this.lastValues[handle] = clone(value);
+    }
+
+    rememberMetaChange(handle, value) {
+        this.debug('Remembering meta change', { handle, value });
+        this.lastMetaValues[handle] = clone(value);
     }
 
     debouncedBroadcastValueChangeFuncByHandle(handle) {
@@ -252,8 +284,25 @@ export default class Workspace {
         return this.debouncedBroadcastValueChangeFuncsByHandle[handle];
     }
 
+    debouncedBroadcastMetaChangeFuncByHandle(handle) {
+        // use existing debounced function if one already exists
+        const func = this.debouncedBroadcastMetaChangeFuncsByHandle[handle];
+        if (func) return func;
+
+        // if the handle has no debounced broadcast function yet, create one and return it
+        this.debouncedBroadcastMetaChangeFuncsByHandle[handle] = _.debounce((payload) => {
+            this.broadcastMetaChange(payload);
+        }, 500);
+        return this.debouncedBroadcastMetaChangeFuncsByHandle[handle];
+    }
+
     valueHasChanged(handle, newValue) {
         const lastValue = this.lastValues[handle] || null;
+        return JSON.stringify(lastValue) !== JSON.stringify(newValue);
+    }
+
+    metaHasChanged(handle, newValue) {
+        const lastValue = this.lastMetaValues[handle] || null;
         return JSON.stringify(lastValue) !== JSON.stringify(newValue);
     }
 
@@ -265,9 +314,22 @@ export default class Workspace {
         }
     }
 
+    broadcastMetaChange(payload) {
+        // Only my own change events should be broadcasted. Otherwise when other users receive
+        // the broadcast, it will be re-broadcasted, and so on, to infinity and beyond.
+        if (this.user.id == payload.user) {
+            this.whisper('meta-updated', payload);
+        }
+    }
+
     applyBroadcastedValueChange(payload) {
-        this.debug('✅ Applying broadcasted change', payload);
+        this.debug('✅ Applying broadcasted value change', payload);
         Statamic.$store.dispatch(`publish/${this.container.name}/setFieldValue`, payload);
+    }
+
+    applyBroadcastedMetaChange(payload) {
+        this.debug('✅ Applying broadcasted meta change', payload);
+        Statamic.$store.dispatch(`publish/${this.container.name}/setFieldMeta`, payload);
     }
 
     debug(message, args) {
