@@ -1,9 +1,11 @@
 import Manager from './Manager';
+import StatusBar from './StatusBar.vue';
+import BlockingNotification from './BlockingNotification.vue';
 const manager = new Manager;
 
 Statamic.booting(() => {
-    Statamic.component('CollaborationStatusBar', require('./StatusBar.vue'));
-    Statamic.component('CollaborationBlockingNotification', require('./BlockingNotification.vue'));
+    Statamic.component('CollaborationStatusBar', StatusBar);
+    Statamic.component('CollaborationBlockingNotification', BlockingNotification);
 
     Statamic.$store.registerModule('collaboration', {
         namespaced: true
