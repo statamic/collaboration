@@ -20,6 +20,7 @@ export default class Workspace {
         this.initializeEcho();
         this.initializeStore();
         this.initializeFocus();
+        this.initializeValuesAndMeta();
         this.initializeHooks();
         this.initializeStatusBar();
         this.started = true;
@@ -318,8 +319,21 @@ export default class Workspace {
         // Only my own change events should be broadcasted. Otherwise when other users receive
         // the broadcast, it will be re-broadcasted, and so on, to infinity and beyond.
         if (this.user.id == payload.user) {
-            this.whisper('meta-updated', payload);
+            this.whisper('meta-updated', this.cleanMetaPayload(payload));
         }
+    }
+
+    // Allow fieldtypes to provide an array of keys that will be broadcasted.
+    // For example, in Bard, only the "existing" value in its meta object
+    // ever gets updated. We'll just broadcast that, rather than the
+    // whole thing, which would be wasted bytes in the message.
+    cleanMetaPayload(payload) {
+        const allowed = data_get(payload, 'value.__collaboration');
+        if (! allowed) return payload;
+        let allowedValues = {};
+        allowed.forEach(key => allowedValues[key] = payload.value[key]);
+        payload.value = allowedValues;
+        return payload;
     }
 
     applyBroadcastedValueChange(payload) {
@@ -329,6 +343,8 @@ export default class Workspace {
 
     applyBroadcastedMetaChange(payload) {
         this.debug('✅ Applying broadcasted meta change', payload);
+        let value = {...this.lastMetaValues[payload.handle], ...payload.value};
+        payload.value = value;
         Statamic.$store.dispatch(`publish/${this.container.name}/setFieldMeta`, payload);
     }
 
@@ -354,5 +370,10 @@ export default class Workspace {
         el.volume = 0.25;
         el.addEventListener('ended', () => el.remove());
         el.play();
+    }
+
+    initializeValuesAndMeta() {
+        this.lastValues = Statamic.$store.state.publish[this.container.name].values;
+        this.lastMetaValues = Statamic.$store.state.publish[this.container.name].meta;
     }
 }
