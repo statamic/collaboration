@@ -348,7 +348,7 @@ export default class Workspace {
         const msgId = Math.random() + '';
 
         for (let i = 0; i * chunkSize < str.length; i++) {
-            this.channel.whisper(`chunked-${event}`, {
+            this.channel.whisper(event, {
                 id: msgId,
                 index: i,
                 chunk: str.substr(i * chunkSize, chunkSize),
@@ -363,7 +363,7 @@ export default class Workspace {
     listenForWhisper(event, callback) {
         let events = {};
 
-        this.channel.listenForWhisper(`chunked-${event}`, data => {
+        this.channel.listenForWhisper(event, data => {
             if (! events.hasOwnProperty(data.id)) {
                 events[data.id] = { chunks: [], receivedFinal: false };
             }
