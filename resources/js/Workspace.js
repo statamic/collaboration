@@ -347,22 +347,31 @@ export default class Workspace {
         const str = JSON.stringify(payload);
         const msgId = Math.random() + '';
 
+        if (str.length < chunkSize) {
+            this.debug(`📣 Broadcasting "${event}"`, payload);
+            this.channel.whisper(event, payload);
+            return;
+        }
+
+        event = `chunked-${event}`;
+
         for (let i = 0; i * chunkSize < str.length; i++) {
-            this.channel.whisper(event, {
+            const chunk = {
                 id: msgId,
                 index: i,
                 chunk: str.substr(i * chunkSize, chunkSize),
                 final: chunkSize * (i + 1) >= str.length
-            });
+            };
+            this.debug(`📣 Broadcasting "${event}"`, chunk);
+            this.channel.whisper(event, chunk);
         }
-
-        this.debug(`📣 Broadcasting "${event}"`, payload);
     }
 
     listenForWhisper(event, callback) {
-        let events = {};
+        this.channel.listenForWhisper(event, callback);
 
-        this.channel.listenForWhisper(event, data => {
+        let events = {};
+        this.channel.listenForWhisper(`chunked-${event}`, data => {
             if (! events.hasOwnProperty(data.id)) {
                 events[data.id] = { chunks: [], receivedFinal: false };
             }
