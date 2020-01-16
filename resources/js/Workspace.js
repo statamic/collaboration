@@ -46,7 +46,7 @@ export default class Workspace {
             Statamic.$toast.success(`${user.name} has joined.`);
             this.whisper(`initialize-state-for-${user.id}`, {
                 values: Statamic.$store.state.publish[this.container.name].values,
-                meta: Statamic.$store.state.publish[this.container.name].meta,
+                meta: this.cleanEntireMetaPayload(Statamic.$store.state.publish[this.container.name].meta),
                 focus: Statamic.$store.state.collaboration[this.channelName].focus,
             });
             this.playAudio('buddy-in');
@@ -71,7 +71,7 @@ export default class Workspace {
             if (this.initialStateUpdated) return;
             this.debug('✅ Applying broadcasted state change', payload);
             Statamic.$store.dispatch(`publish/${this.container.name}/setValues`, payload.values);
-            Statamic.$store.dispatch(`publish/${this.container.name}/setMeta`, payload.meta);
+            Statamic.$store.dispatch(`publish/${this.container.name}/setMeta`, this.restoreEntireMetaPayload(payload.meta));
             _.each(payload.focus, ({ user, handle }) => this.focusAndLock(user, handle));
             this.initialStateUpdated = true;
         });
@@ -334,6 +334,25 @@ export default class Workspace {
         allowed.forEach(key => allowedValues[key] = payload.value[key]);
         payload.value = allowedValues;
         return payload;
+    }
+
+    // Similar to cleanMetaPayload, except for when dealing with the
+    // entire list of fields' meta values. Used when a user joins
+    // and needs to receive everything in one fell swoop.
+    cleanEntireMetaPayload(values) {
+        return _.mapObject(values, meta => {
+            const allowed = data_get(meta, '__collaboration');
+            if (!allowed) return meta;
+            let allowedValues = {};
+            allowed.forEach(key => allowedValues[key] = meta[key]);
+            return allowedValues;
+        });
+    }
+
+    restoreEntireMetaPayload(payload) {
+        return _.mapObject(payload, (value, key) => {
+            return {...this.lastMetaValues[key], ...value};
+        });
     }
 
     applyBroadcastedValueChange(payload) {
