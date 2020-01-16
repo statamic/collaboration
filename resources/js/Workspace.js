@@ -58,15 +58,15 @@ export default class Workspace {
             this.playAudio('buddy-out');
         });
 
-        this.channel.listenForWhisper('updated', e => {
+        this.listenForWhisper('updated', e => {
             this.applyBroadcastedValueChange(e);
         });
 
-        this.channel.listenForWhisper('meta-updated', e => {
+        this.listenForWhisper('meta-updated', e => {
             this.applyBroadcastedMetaChange(e);
         });
 
-        this.channel.listenForWhisper(`initialize-state-for-${this.user.id}`, payload => {
+        this.listenForWhisper(`initialize-state-for-${this.user.id}`, payload => {
             if (this.initialStateUpdated) return;
             this.debug('✅ Applying broadcasted state change', payload);
             Statamic.$store.dispatch(`publish/${this.container.name}/setValues`, payload.values);
@@ -75,17 +75,17 @@ export default class Workspace {
             this.initialStateUpdated = true;
         });
 
-        this.channel.listenForWhisper('focus', ({ user, handle }) => {
+        this.listenForWhisper('focus', ({ user, handle }) => {
             this.debug(`Heard that user has changed focus`, { user, handle });
             this.focusAndLock(user, handle);
         });
 
-        this.channel.listenForWhisper('blur', ({ user, handle }) => {
+        this.listenForWhisper('blur', ({ user, handle }) => {
             this.debug(`Heard that user has blurred`, { user, handle });
             this.blurAndUnlock(user, handle);
         });
 
-        this.channel.listenForWhisper('force-unlock', ({ targetUser, originUser }) => {
+        this.listenForWhisper('force-unlock', ({ targetUser, originUser }) => {
             this.debug(`Heard that user has requested another be unlocked`, { targetUser, originUser });
 
             if (targetUser.id !== this.user.id) return;
@@ -96,11 +96,11 @@ export default class Workspace {
             Statamic.$toast.info(`${originUser.name} has unlocked your editor.`, { duration: false });
         });
 
-        this.channel.listenForWhisper('saved', ({ user }) => {
+        this.listenForWhisper('saved', ({ user }) => {
             Statamic.$toast.success(`Saved by ${user.name}.`);
         });
 
-        this.channel.listenForWhisper('published', ({ user, message }) => {
+        this.listenForWhisper('published', ({ user, message }) => {
             Statamic.$toast.success(`Published by ${user.name}.`);
             const messageProp = message
                 ? `Entry has been published by ${user.name} with the message: ${message}`
@@ -111,7 +111,7 @@ export default class Workspace {
             this.destroy(); // Stop listening to anything else.
         });
 
-        this.channel.listenForWhisper('revision-restored', ({ user }) => {
+        this.listenForWhisper('revision-restored', ({ user }) => {
             Statamic.$toast.success(`Revision restored by ${user.name}.`);
             Statamic.$components.append('CollaborationBlockingNotification', {
                 props: { message: `Entry has been restored to another revision by ${user.name}` }
@@ -343,8 +343,39 @@ export default class Workspace {
     whisper(event, payload) {
         if (this.isAlone()) return;
 
+        const chunkSize = 9000;
+        const str = JSON.stringify(payload);
+        const msgId = Math.random() + '';
+
+        for (let i = 0; i * chunkSize < str.length; i++) {
+            this.channel.whisper(`chunked-${event}`, {
+                id: msgId,
+                index: i,
+                chunk: str.substr(i * chunkSize, chunkSize),
+                final: chunkSize * (i + 1) >= str.length
+            });
+        }
+
         this.debug(`📣 Broadcasting "${event}"`, payload);
         this.channel.whisper(event, payload);
+    }
+
+    listenForWhisper(event, callback) {
+        let events = {};
+
+        this.channel.listenForWhisper(`chunked-${event}`, data => {
+            if (! events.hasOwnProperty(data.id)) {
+                events[data.id] = { chunks: [], receivedFinal: false };
+            }
+
+            let e = events[data.id];
+            e.chunks[data.index] = data.chunk;
+            if (data.final) e.receivedFinal = true;
+            if (e.receivedFinal && e.chunks.length === Object.keys(e.chunks).length) {
+                callback(JSON.parse(e.chunks.join('')));
+                delete events[data.id];
+            }
+        });
     }
 
     playAudio(file) {
