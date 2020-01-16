@@ -357,7 +357,6 @@ export default class Workspace {
         }
 
         this.debug(`📣 Broadcasting "${event}"`, payload);
-        this.channel.whisper(event, payload);
     }
 
     listenForWhisper(event, callback) {
