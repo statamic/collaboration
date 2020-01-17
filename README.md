@@ -54,3 +54,22 @@ Publish the assets:
 ```
 php artisan vendor:publish --provider="Statamic\Collaboration\ServiceProvider"
 ```
+
+## Advanced Usage
+
+When the ["meta data"](https://statamic.dev/extending/fieldtypes#meta-data) of a fieldtype is updated, it will be broadcast to the other users in the channel. If you have a fieldtype that contains a large amount of meta data, and it gets updated (some may just provide initial state and never change), you may consider specifying the fields that should be broadcast. This could help keep message sizes smaller and improve performance.
+
+In your fieldtype's `preload` method, you can use the special `__collaboration` key to list the fields.
+
+``` php
+public function preload()
+{
+    return [
+        'hello' => 'world',
+        'foo' => 'bar',
+        '__collaboration' => ['foo'],
+    ];
+}
+```
+
+When the meta data gets updated, only the `foo` value will be broadcast. The remaining values will get merged in automatically.

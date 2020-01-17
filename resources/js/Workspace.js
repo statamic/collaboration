@@ -20,6 +20,7 @@ export default class Workspace {
         this.initializeEcho();
         this.initializeStore();
         this.initializeFocus();
+        this.initializeValuesAndMeta();
         this.initializeHooks();
         this.initializeStatusBar();
         this.started = true;
@@ -45,7 +46,7 @@ export default class Workspace {
             Statamic.$toast.success(`${user.name} has joined.`);
             this.whisper(`initialize-state-for-${user.id}`, {
                 values: Statamic.$store.state.publish[this.container.name].values,
-                meta: Statamic.$store.state.publish[this.container.name].meta,
+                meta: this.cleanEntireMetaPayload(Statamic.$store.state.publish[this.container.name].meta),
                 focus: Statamic.$store.state.collaboration[this.channelName].focus,
             });
             this.playAudio('buddy-in');
@@ -70,7 +71,7 @@ export default class Workspace {
             if (this.initialStateUpdated) return;
             this.debug('✅ Applying broadcasted state change', payload);
             Statamic.$store.dispatch(`publish/${this.container.name}/setValues`, payload.values);
-            Statamic.$store.dispatch(`publish/${this.container.name}/setMeta`, payload.meta);
+            Statamic.$store.dispatch(`publish/${this.container.name}/setMeta`, this.restoreEntireMetaPayload(payload.meta));
             _.each(payload.focus, ({ user, handle }) => this.focusAndLock(user, handle));
             this.initialStateUpdated = true;
         });
@@ -318,8 +319,40 @@ export default class Workspace {
         // Only my own change events should be broadcasted. Otherwise when other users receive
         // the broadcast, it will be re-broadcasted, and so on, to infinity and beyond.
         if (this.user.id == payload.user) {
-            this.whisper('meta-updated', payload);
+            this.whisper('meta-updated', this.cleanMetaPayload(payload));
         }
+    }
+
+    // Allow fieldtypes to provide an array of keys that will be broadcasted.
+    // For example, in Bard, only the "existing" value in its meta object
+    // ever gets updated. We'll just broadcast that, rather than the
+    // whole thing, which would be wasted bytes in the message.
+    cleanMetaPayload(payload) {
+        const allowed = data_get(payload, 'value.__collaboration');
+        if (! allowed) return payload;
+        let allowedValues = {};
+        allowed.forEach(key => allowedValues[key] = payload.value[key]);
+        payload.value = allowedValues;
+        return payload;
+    }
+
+    // Similar to cleanMetaPayload, except for when dealing with the
+    // entire list of fields' meta values. Used when a user joins
+    // and needs to receive everything in one fell swoop.
+    cleanEntireMetaPayload(values) {
+        return _.mapObject(values, meta => {
+            const allowed = data_get(meta, '__collaboration');
+            if (!allowed) return meta;
+            let allowedValues = {};
+            allowed.forEach(key => allowedValues[key] = meta[key]);
+            return allowedValues;
+        });
+    }
+
+    restoreEntireMetaPayload(payload) {
+        return _.mapObject(payload, (value, key) => {
+            return {...this.lastMetaValues[key], ...value};
+        });
     }
 
     applyBroadcastedValueChange(payload) {
@@ -329,6 +362,8 @@ export default class Workspace {
 
     applyBroadcastedMetaChange(payload) {
         this.debug('✅ Applying broadcasted meta change', payload);
+        let value = {...this.lastMetaValues[payload.handle], ...payload.value};
+        payload.value = value;
         Statamic.$store.dispatch(`publish/${this.container.name}/setFieldMeta`, payload);
     }
 
@@ -393,5 +428,10 @@ export default class Workspace {
         el.volume = 0.25;
         el.addEventListener('ended', () => el.remove());
         el.play();
+    }
+
+    initializeValuesAndMeta() {
+        this.lastValues = Statamic.$store.state.publish[this.container.name].values;
+        this.lastMetaValues = Statamic.$store.state.publish[this.container.name].meta;
     }
 }
