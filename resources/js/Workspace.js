@@ -431,7 +431,7 @@ export default class Workspace {
     }
 
     initializeValuesAndMeta() {
-        this.lastValues = Statamic.$store.state.publish[this.container.name].values;
-        this.lastMetaValues = Statamic.$store.state.publish[this.container.name].meta;
+        this.lastValues = clone(Statamic.$store.state.publish[this.container.name].values);
+        this.lastMetaValues = clone(Statamic.$store.state.publish[this.container.name].meta);
     }
 }
