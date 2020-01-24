@@ -378,7 +378,7 @@ export default class Workspace {
     whisper(event, payload) {
         if (this.isAlone()) return;
 
-        const chunkSize = 9000;
+        const chunkSize = 8000;
         const str = JSON.stringify(payload);
         const msgId = Math.random() + '';
 
