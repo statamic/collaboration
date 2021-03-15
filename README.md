@@ -10,17 +10,6 @@
 
 ## Installation
 
-Clone the Github repo somewhere, then add it to your `composer.json`'s `repositories` array. (This is only necessary until the package is released.) Adjust the `url` to point to cloned directory.
-
-``` json
-"repositories": [
-    {
-        "type": "path",
-        "url": "addons/statamic/collaboration"
-    }
-]
-```
-
 Require it using Composer, as well as the Pusher library.
 
 ```
