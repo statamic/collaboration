@@ -1,0 +1,48 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v1
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compile assets
+        run: npm run production
+
+      - name: Create zip
+        run: tar -czvf dist.tar.gz dist
+
+      - name: Get Changelog
+        id: changelog
+        uses: statamic/changelog-action@v1
+        with:
+          version: ${{ github.ref }}
+
+      - name: Create release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.changelog.outputs.version }}
+          release_name: ${{ steps.changelog.outputs.version }}
+          body: ${{ steps.changelog.outputs.text }}
+
+      - name: Upload zip to release
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./dist.tar.gz
+          asset_name: dist.tar.gz
+          asset_content_type: application/tar+gz
