@@ -423,7 +423,7 @@ export default class Workspace {
 
     playAudio(file) {
         let el = document.createElement('audio');
-        el.src = cp_url(`../vendor/statamic/collaboration/audio/${file}.mp3`);
+        el.src = cp_url(`../vendor/collaboration/audio/${file}.mp3`);
         document.body.appendChild(el);
         el.volume = 0.25;
         el.addEventListener('ended', () => el.remove());
