@@ -38,12 +38,6 @@ PUSHER_APP_SECRET=
 PUSHER_APP_CLUSTER=
 ```
 
-Publish the assets:
-
-```
-php artisan vendor:publish --provider="Statamic\Collaboration\ServiceProvider"
-```
-
 ## Advanced Usage
 
 When the ["meta data"](https://statamic.dev/extending/fieldtypes#meta-data) of a fieldtype is updated, it will be broadcast to the other users in the channel. If you have a fieldtype that contains a large amount of meta data, and it gets updated (some may just provide initial state and never change), you may consider specifying the fields that should be broadcast. This could help keep message sizes smaller and improve performance.
