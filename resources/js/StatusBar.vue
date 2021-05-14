@@ -11,7 +11,7 @@
                     <template v-slot:trigger>
                         <avatar
                             :user="user"
-                            class="rounded-full w-6 mr-1 cursor-pointer"
+                            class="rounded-full w-6 h-6 mr-1 cursor-pointer text-xs"
                         />
                     </template>
                     <dropdown-item text="Unlock" @click="$emit('unlock', user)" />

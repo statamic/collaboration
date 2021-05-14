@@ -20,6 +20,7 @@ class ServiceProvider extends AddonServiceProvider
                 'id' => $user->id(),
                 'title' => $user->title(),
                 'email' => $user->email(),
+                'avatar' => $user->avatar(),
                 'initials' => $user->initials(),
             ];
         });
