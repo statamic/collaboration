@@ -14,7 +14,7 @@ Require it using Composer, as well as the Pusher library.
 
 ```
 composer require statamic/collaboration
-composer require pusher/pusher-php-server "~3.0"
+composer require pusher/pusher-php-server "^5.0"
 ```
 
 Uncomment `BroadcastServiceProvider` from `config/app.php`'s `providers` array if it isn't already.
@@ -27,11 +27,17 @@ Uncomment `BroadcastServiceProvider` from `config/app.php`'s `providers` array i
 ]
 ```
 
-Make sure your Pusher credentials are added to `.env`:
+In your `.env` file, make sure the `pusher` broadcast driver is used:
 
 ```
 BROADCAST_DRIVER=pusher
+```
 
+Create an app inside your Pusher account. Make sure "Client Events" are enabled.
+
+Add your Pusher app credentials to your `.env` file:
+
+```
 PUSHER_APP_ID=
 PUSHER_APP_KEY=
 PUSHER_APP_SECRET=
