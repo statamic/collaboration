@@ -1,6 +1,8 @@
+<!-- statamic:hide -->
 # Collaboration
 
-> Collaboration tools for Statamic 3.
+> Realtime collaboration and multi-user authoring for Statamic Pro.
+<!-- /statamic:hide -->
 
 ## Features
 
