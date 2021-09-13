@@ -7,7 +7,7 @@ export default class Workspace {
         this.storeSubscriber = null;
         this.lastValues = {};
         this.lastMetaValues = {};
-        this.user = Statamic.user;
+        this.self = null;
         this.initialStateUpdated = false;
 
         this.debouncedBroadcastValueChangeFuncsByHandle = {};
@@ -36,27 +36,51 @@ export default class Workspace {
         this.channelName = `${reference}.${this.container.site}`;
         this.channel = this.echo.join(this.channelName);
 
-        this.channel.here(users => {
+        this.channel.on('pusher:subscription_succeeded', (data) => { // "here"
+            this.self = data.me;
+
             this.subscribeToVuexMutations();
+
+            const users = Object.keys(data.members).map((id) => ({ id, info: data.members[id] }));
             Statamic.$store.commit(`collaboration/${this.channelName}/setUsers`, users);
+            Statamic.$hooks.run('user.set', {
+                collection: this.container.blueprint,
+                users: users,
+            });
+
+            // expect init state
+            this.listenForWhisper(`initialize-state-for-${this.self.id}`, payload => {
+                if (this.initialStateUpdated) return;
+                this.debug('✅ Applying broadcasted state change', payload);
+                Statamic.$store.dispatch(`publish/${this.container.name}/setValues`, payload.values);
+                Statamic.$store.dispatch(`publish/${this.container.name}/setMeta`, this.restoreEntireMetaPayload(payload.meta));
+                _.each(payload.focus, ({ handle }, user) => this.focusAndLock(user, handle));
+                this.initialStateUpdated = true;
+            });
         });
 
-        this.channel.joining(user => {
+        this.channel.on('pusher:member_added', user => { // "joining"
+            if (!Statamic.$store.state.collaboration[this.channelName].users.some(u => u.info.id === user.info.id)) {
+                // actual new user, not just a new session by a known user
+                Statamic.$toast.success(`${user.info.name} has joined.`);
+                this.playAudio('buddy-in');
+            }
             Statamic.$store.commit(`collaboration/${this.channelName}/addUser`, user);
-            Statamic.$toast.success(`${user.name} has joined.`);
             this.whisper(`initialize-state-for-${user.id}`, {
                 values: Statamic.$store.state.publish[this.container.name].values,
                 meta: this.cleanEntireMetaPayload(Statamic.$store.state.publish[this.container.name].meta),
                 focus: Statamic.$store.state.collaboration[this.channelName].focus,
             });
-            this.playAudio('buddy-in');
         });
 
-        this.channel.leaving(user => {
+        this.channel.on('pusher:member_removed', user => { // "leaving"
+            this.blurAndUnlock(user.id);
             Statamic.$store.commit(`collaboration/${this.channelName}/removeUser`, user);
-            Statamic.$toast.success(`${user.name} has left.`);
-            this.blurAndUnlock(user);
-            this.playAudio('buddy-out');
+            if (!Statamic.$store.state.collaboration[this.channelName].users.some(u => u.info.id === user.info.id)) {
+                // user closed last session
+                Statamic.$toast.success(`${user.info.name} has left.`);
+                this.playAudio('buddy-out');
+            }
         });
 
         this.listenForWhisper('updated', e => {
@@ -65,15 +89,6 @@ export default class Workspace {
 
         this.listenForWhisper('meta-updated', e => {
             this.applyBroadcastedMetaChange(e);
-        });
-
-        this.listenForWhisper(`initialize-state-for-${this.user.id}`, payload => {
-            if (this.initialStateUpdated) return;
-            this.debug('✅ Applying broadcasted state change', payload);
-            Statamic.$store.dispatch(`publish/${this.container.name}/setValues`, payload.values);
-            Statamic.$store.dispatch(`publish/${this.container.name}/setMeta`, this.restoreEntireMetaPayload(payload.meta));
-            _.each(payload.focus, ({ user, handle }) => this.focusAndLock(user, handle));
-            this.initialStateUpdated = true;
         });
 
         this.listenForWhisper('focus', ({ user, handle }) => {
@@ -89,33 +104,36 @@ export default class Workspace {
         this.listenForWhisper('force-unlock', ({ targetUser, originUser }) => {
             this.debug(`Heard that user has requested another be unlocked`, { targetUser, originUser });
 
-            if (targetUser.id !== this.user.id) return;
+            if (targetUser !== this.self.info.id) return; // force-unlock applies to all sessions by a user
 
             document.activeElement.blur();
-            this.blurAndUnlock(this.user);
-            this.whisper('blur', { user: this.user });
+            this.blurAndUnlock(this.self.id);
+            this.whisper('blur', { user: this.self.id });
             Statamic.$toast.info(`${originUser.name} has unlocked your editor.`, { duration: false });
         });
 
         this.listenForWhisper('saved', ({ user }) => {
-            Statamic.$toast.success(`Saved by ${user.name}.`);
+            const userInfo = Statamic.$store.state.collaboration[this.channelName].users.find(u => u.id == user).info;
+            this.container.saved();
+            Statamic.$toast.success(`Saved by ${userInfo.name}.`);
         });
 
         this.listenForWhisper('published', ({ user, message }) => {
-            Statamic.$toast.success(`Published by ${user.name}.`);
+            const userInfo = Statamic.$store.state.collaboration[this.channelName].users.find(u => u.id == user).info;
+            Statamic.$toast.success(`Published by ${userInfo.name}.`);
             const messageProp = message
-                ? `Entry has been published by ${user.name} with the message: ${message}`
-                : `Entry has been published by ${user.name} with no message.`
+                ? `Entry has been published by ${userInfo.name} with the message: ${message}`
+                : `Entry has been published by ${userInfo.name} with no message.`
             Statamic.$components.append('CollaborationBlockingNotification', {
                 props: { message: messageProp }
             }).on('confirm', () => window.location.reload());
-            this.destroy(); // Stop listening to anything else.
         });
 
         this.listenForWhisper('revision-restored', ({ user }) => {
-            Statamic.$toast.success(`Revision restored by ${user.name}.`);
+            const userInfo = Statamic.$store.state.collaboration[this.channelName].users.find(u => u.id == user).info;
+            Statamic.$toast.success(`Revision restored by ${userInfo.name}.`);
             Statamic.$components.append('CollaborationBlockingNotification', {
-                props: { message: `Entry has been restored to another revision by ${user.name}` }
+                props: { message: `Entry has been restored to another revision by ${userInfo.name}` }
             }).on('confirm', () => window.location.reload());
             this.destroy(); // Stop listening to anything else.
         });
@@ -139,10 +157,10 @@ export default class Workspace {
                     state.users = state.users.filter(user => user.id !== removedUser.id);
                 },
                 focus(state, { handle, user }) {
-                    Vue.set(state.focus, user.id, { handle, user });
+                    Vue.set(state.focus, user, { handle });
                 },
                 blur(state, user) {
-                    Vue.delete(state.focus, user.id);
+                    Vue.delete(state.focus, user);
                 }
             }
         });
@@ -157,21 +175,21 @@ export default class Workspace {
         });
 
         component.on('unlock', (targetUser) => {
-            this.whisper('force-unlock', { targetUser, originUser: this.user });
+            this.whisper('force-unlock', { targetUser, originUser: this.self.id });
         });
     }
 
     initializeHooks() {
         Statamic.$hooks.on('entry.saved', (resolve, reject, { reference }) => {
             if (reference === this.container.reference) {
-                this.whisper('saved', { user: this.user });
+                this.whisper('saved', { user: this.self.id });
             }
             resolve();
         });
 
         Statamic.$hooks.on('entry.published', (resolve, reject, { reference, message }) => {
             if (reference === this.container.reference) {
-                this.whisper('published', { user: this.user, message });
+                this.whisper('published', { user: this.self.id, message });
             }
             resolve();
         });
@@ -179,7 +197,7 @@ export default class Workspace {
         Statamic.$hooks.on('revision.restored', (resolve, reject, { reference }) => {
             if (reference !== this.container.reference) return resolve();
 
-            this.whisper('revision-restored', { user: this.user });
+            this.whisper('revision-restored', { user: this.self.id });
 
             // Echo doesn't give us a promise, so wait half a second before resolving.
             // That should be enough time for the whisper to be sent before the the page refreshes.
@@ -189,14 +207,14 @@ export default class Workspace {
 
     initializeFocus() {
         this.container.$on('focus', handle => {
-            const user = this.user;
-            this.focus(user, handle);
-            this.whisper('focus', { user, handle });
+            if (!this.self) return;
+            this.focus(this.self.id, handle);
+            this.whisper('focus', { user: this.self.id, handle });
         });
         this.container.$on('blur', handle => {
-            const user = this.user;
-            this.blur(user, handle);
-            this.whisper('blur', { user, handle });
+            if (!this.self) return;
+            this.blur(this.self.id);
+            this.whisper('blur', { user: this.self.id, handle });
         });
     }
 
@@ -206,7 +224,8 @@ export default class Workspace {
 
     focusAndLock(user, handle) {
         this.focus(user, handle);
-        Statamic.$store.commit(`publish/${this.container.name}/lockField`, { user, handle });
+        const userInfo = Statamic.$store.state.collaboration[this.channelName].users.find(u => u.id == user).info;
+        Statamic.$store.commit(`publish/${this.container.name}/lockField`, { user: userInfo, handle });
     }
 
     blur(user) {
@@ -214,7 +233,7 @@ export default class Workspace {
     }
 
     blurAndUnlock(user, handle = null) {
-        handle = handle || data_get(Statamic.$store.state.collaboration[this.channelName], `focus.${user.id}.handle`);
+        handle = handle || Statamic.$store.state.collaboration[this.channelName]?.focus[user]?.handle;
         if (!handle) return;
         this.blur(user);
         Statamic.$store.commit(`publish/${this.container.name}/unlockField`, handle);
@@ -310,7 +329,8 @@ export default class Workspace {
     broadcastValueChange(payload) {
         // Only my own change events should be broadcasted. Otherwise when other users receive
         // the broadcast, it will be re-broadcasted, and so on, to infinity and beyond.
-        if (this.user.id == payload.user) {
+        if (payload.user === this.self.info.id && !payload.user.includes('#')) {
+            payload.user = this.self.id // override with tab-specific ID
             this.whisper('updated', payload);
         }
     }
@@ -318,7 +338,8 @@ export default class Workspace {
     broadcastMetaChange(payload) {
         // Only my own change events should be broadcasted. Otherwise when other users receive
         // the broadcast, it will be re-broadcasted, and so on, to infinity and beyond.
-        if (this.user.id == payload.user) {
+        if (payload.user === this.self.info.id && !payload.user.includes('#')) {
+            payload.user = this.self.id // override with tab-specific ID
             this.whisper('meta-updated', this.cleanMetaPayload(payload));
         }
     }
@@ -351,7 +372,7 @@ export default class Workspace {
 
     restoreEntireMetaPayload(payload) {
         return _.mapObject(payload, (value, key) => {
-            return {...this.lastMetaValues[key], ...value};
+            return { ...this.lastMetaValues[key], ...value };
         });
     }
 
@@ -362,13 +383,13 @@ export default class Workspace {
 
     applyBroadcastedMetaChange(payload) {
         this.debug('✅ Applying broadcasted meta change', payload);
-        let value = {...this.lastMetaValues[payload.handle], ...payload.value};
+        let value = { ...this.lastMetaValues[payload.handle], ...payload.value };
         payload.value = value;
         Statamic.$store.dispatch(`publish/${this.container.name}/setFieldMeta`, payload);
     }
 
     debug(message, args) {
-        console.log('[Collaboration]', message, {...args});
+        console.log('[Collaboration]', message, { ...args });
     }
 
     isAlone() {
@@ -423,7 +444,7 @@ export default class Workspace {
 
     playAudio(file) {
         let el = document.createElement('audio');
-        el.src = cp_url(`../vendor/collaboration/audio/${file}.mp3`);
+        el.src = cp_url(`../vendor/statamic/collaboration/resources/audio/${file}.mp3`);
         document.body.appendChild(el);
         el.volume = 0.25;
         el.addEventListener('ended', () => el.remove());
