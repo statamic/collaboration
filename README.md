@@ -35,7 +35,7 @@ In your `.env` file, make sure the `pusher` broadcast driver is used:
 BROADCAST_DRIVER=pusher
 ```
 
-Create an app inside your Pusher account. Make sure "Client Events" are enabled.
+Create an app inside your [Pusher account](https://pusher.com). Make sure "Client Events" are enabled.
 
 Add your Pusher app credentials to your `.env` file:
 
