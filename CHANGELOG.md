@@ -1,5 +1,10 @@
 # Release Notes
 
+## 0.4.0 (2022-03-16)
+- Support Statamic 3.3. [#60](https://github.com/statamic/cms/issues/60)
+
+
+
 ## 0.3.0 (2020-09-08)
 
 ### What's fixed
