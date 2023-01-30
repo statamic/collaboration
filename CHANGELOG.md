@@ -1,5 +1,10 @@
 # Release Notes
 
+## 0.5.0 (2023-01-30)
+- Support Statamic 3.4.
+
+
+
 ## 0.4.0 (2022-03-16)
 - Support Statamic 3.3. [#60](https://github.com/statamic/collaboration/issues/60)
 
