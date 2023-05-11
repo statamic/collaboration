@@ -1,11 +1,22 @@
 # Release Notes
 
+## 0.6.0 (2023-05-11)
+
+### What's new
+- Support Statamic 4.0. [#80](https://github.com/statamic/collaboration/pull/80)
+
+
+
 ## 0.5.0 (2023-01-30)
-- Support Statamic 3.4.
+
+### What's new
+- Support Statamic 3.4. [#60](https://github.com/statamic/collaboration/issues/74)
 
 
 
 ## 0.4.0 (2022-03-16)
+
+### What's new
 - Support Statamic 3.3. [#60](https://github.com/statamic/collaboration/issues/60)
 
 
