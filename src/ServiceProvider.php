@@ -7,7 +7,12 @@ use Statamic\Providers\AddonServiceProvider;
 
 class ServiceProvider extends AddonServiceProvider
 {
-    protected $scripts = [__DIR__.'/../dist/js/collaboration.js'];
+    protected $vite = [
+        'input' => ['resources/js/collaboration.js'],
+        'publicDirectory' => 'resources/dist',
+        'hotFile' => __DIR__.'/../resources/dist/hot',
+    ];
+
     protected $publishables = [__DIR__.'/../dist/audio' => 'audio'];
 
     public function boot()
