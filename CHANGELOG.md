@@ -2,17 +2,17 @@
 
 ## 0.7.1 (2023-06-27)
 
-## What's fixed
+### What's fixed
 - Fix release workflow.
 
 
 
 ## 0.7.0 (2023-06-27)
 
-## What's new
+### What's new
 - Migrate from mix to vite. https://github.com/statamic/collaboration/pull/85
 
-## Major changes
+### Major changes
 - Statamic 3 is no longer supported.
 
 
