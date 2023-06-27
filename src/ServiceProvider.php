@@ -13,8 +13,6 @@ class ServiceProvider extends AddonServiceProvider
         'hotFile' => __DIR__.'/../resources/dist/hot',
     ];
 
-    protected $publishables = [__DIR__.'/../dist/audio' => 'audio'];
-
     public function boot()
     {
         parent::boot();
