@@ -1,5 +1,12 @@
 # Release Notes
 
+## 0.7.2 (2023-06-27)
+
+### What's fixed
+- Fix vite base url.
+
+
+
 ## 0.7.1 (2023-06-27)
 
 ### What's fixed
