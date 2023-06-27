@@ -19,7 +19,7 @@
         },
         "download-dist": {
             "url": "https://github.com/statamic/collaboration/releases/download/{$version}/dist.tar.gz",
-            "path": "dist"
+            "path": "resources/dist"
         }
     },
     "autoload": {
