@@ -1,3 +1,6 @@
+import buddyIn from '../audio/buddy-in.mp3'
+import buddyOut from '../audio/buddy-out.mp3'
+
 export default class Workspace {
 
     constructor(container) {
@@ -423,11 +426,21 @@ export default class Workspace {
 
     playAudio(file) {
         let el = document.createElement('audio');
-        el.src = cp_url(`../vendor/collaboration/audio/${file}.mp3`);
+        el.src = this.getViteAudioFile(file);
         document.body.appendChild(el);
         el.volume = 0.25;
         el.addEventListener('ended', () => el.remove());
         el.play();
+    }
+
+    getViteAudioFile(file) {
+        if (file === 'buddy-in') {
+            return buddyIn;
+        } else if (file === 'buddy-out') {
+            return buddyOut;
+        }
+
+        console.error('audio not found');
     }
 
     initializeValuesAndMeta() {

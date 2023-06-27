@@ -16,10 +16,10 @@ jobs:
         run: npm ci
 
       - name: Compile assets
-        run: npm run production
+        run: npm run build
 
       - name: Create zip
-        run: tar -czvf dist.tar.gz dist
+        run: tar -czvf dist.tar.gz resources/dist
 
       - name: Get Changelog
         id: changelog
