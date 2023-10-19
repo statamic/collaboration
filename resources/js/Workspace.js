@@ -36,7 +36,7 @@ export default class Workspace {
 
     initializeEcho() {
         const reference = this.container.reference.replaceAll('::', '.');
-        this.channelName = `${reference}.${this.container.site}`;
+        this.channelName = `${reference}.${this.container.site.replaceAll('.', '_')}`;
         this.channel = this.echo.join(this.channelName);
 
         this.channel.here(users => {
