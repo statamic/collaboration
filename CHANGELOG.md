@@ -1,5 +1,13 @@
 # Release Notes
 
+## 0.7.3 (2023-10-19)
+
+### What's fixed
+- Fix error when site has dots in it. [#89](https://github.com/statamic/collaboration/issues/89)
+- Bump postcss from 8.4.24 to 8.4.31. [#87](https://github.com/statamic/collaboration/issues/87)
+
+
+
 ## 0.7.2 (2023-06-27)
 
 ### What's fixed
