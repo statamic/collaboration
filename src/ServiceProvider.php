@@ -3,6 +3,7 @@
 namespace Statamic\Collaboration;
 
 use Illuminate\Support\Facades\Broadcast;
+use Statamic\Facades\User;
 use Statamic\Providers\AddonServiceProvider;
 
 class ServiceProvider extends AddonServiceProvider
@@ -18,6 +19,8 @@ class ServiceProvider extends AddonServiceProvider
         parent::boot();
 
         Broadcast::channel('entry.{id}.{site}', function ($user, $id, $site) {
+            $user = User::fromUser($user);
+            
             return [
                 'name' => $user->name(),
                 'id' => $user->id(),
