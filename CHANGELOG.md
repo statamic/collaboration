@@ -1,5 +1,19 @@
 # Release Notes
 
+## 0.8.1 (2023-12-06)
+
+### What's fixed
+- Fixed missing asset bundle.
+
+
+
+## 0.8.0 (2023-12-05)
+
+### What's new
+- Support Eloquent driven users. [#91](https://github.com/statamic/collaboration/issues/91)
+
+
+
 ## 0.7.3 (2023-10-19)
 
 ### What's fixed
