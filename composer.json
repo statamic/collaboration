@@ -1,7 +1,7 @@
 {
     "name": "statamic/collaboration",
     "type": "statamic-addon",
-    "description": "Collaboration tools for Statamic 3",
+    "description": "Real-time collaboration and multi-user authoring for Statamic Pro.",
     "license": "proprietary",
     "require": {
         "statamic/cms": "^5.0",
@@ -15,7 +15,7 @@
         },
         "statamic": {
             "name": "Collaboration",
-            "description": "Collaboration tools"
+            "description": "Real-time collaboration and multi-user authoring for Statamic Pro."
         },
         "download-dist": {
             "url": "https://github.com/statamic/collaboration/releases/download/{$version}/dist.tar.gz",
