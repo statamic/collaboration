@@ -52,14 +52,20 @@ export default class Workspace {
                 meta: this.cleanEntireMetaPayload(Statamic.$store.state.publish[this.container.name].meta),
                 focus: Statamic.$store.state.collaboration[this.channelName].focus,
             });
-            this.playAudio('buddy-in');
+
+            if (Statamic.$config.get('collaboration.sound_effects')) {
+                this.playAudio('buddy-in');
+            }
         });
 
         this.channel.leaving(user => {
             Statamic.$store.commit(`collaboration/${this.channelName}/removeUser`, user);
             Statamic.$toast.success(`${user.name} has left.`);
             this.blurAndUnlock(user);
-            this.playAudio('buddy-out');
+
+            if (Statamic.$config.get('collaboration.sound_effects')) {
+                this.playAudio('buddy-out');
+            }
         });
 
         this.listenForWhisper('updated', e => {
