@@ -20,7 +20,33 @@ class ServiceProvider extends AddonServiceProvider
 
         Broadcast::channel('entry.{id}.{site}', function ($user, $id, $site) {
             $user = User::fromUser($user);
-            
+
+            return [
+                'name' => $user->name(),
+                'id' => $user->id(),
+                'title' => $user->title(),
+                'email' => $user->email(),
+                'avatar' => $user->avatar(),
+                'initials' => $user->initials(),
+            ];
+        });
+
+        Broadcast::channel('globals.{set}.{locale}.{site}', function ($user, $set, $locale, $site) {
+            $user = User::fromUser($user);
+
+            return [
+                'name' => $user->name(),
+                'id' => $user->id(),
+                'title' => $user->title(),
+                'email' => $user->email(),
+                'avatar' => $user->avatar(),
+                'initials' => $user->initials(),
+            ];
+        });
+
+        Broadcast::channel('term.{taxonomy}.{id}.{locale}.{site}', function ($user, $taxonomy, $id, $locale, $site) {
+            $user = User::fromUser($user);
+
             return [
                 'name' => $user->name(),
                 'id' => $user->id(),
