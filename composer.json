@@ -4,7 +4,7 @@
     "description": "Collaboration tools for Statamic 3",
     "license": "proprietary",
     "require": {
-        "statamic/cms": "^4.0",
+        "statamic/cms": "^5.0",
         "pixelfear/composer-dist-plugin": "^0.1.4"
     },
     "extra": {
