@@ -35,7 +35,7 @@ In your `.env` file, make sure the `pusher` broadcast driver is used:
 BROADCAST_DRIVER=pusher
 ```
 
-Create an app inside your [Pusher account](https://pusher.com). 
+Create an app inside your [Pusher account](https://pusher.com).
 
 Be sure to enable the "Client Events" setting (under the "App Settings" page in your Pusher App Dashboard).
 
@@ -46,6 +46,22 @@ PUSHER_APP_ID=
 PUSHER_APP_KEY=
 PUSHER_APP_SECRET=
 PUSHER_APP_CLUSTER=
+```
+
+## Configuration
+
+### Sound Effects
+
+By default, the Collaboration addon plays sound effects when other users join & leave entries.
+
+If you wish to disable these, you may publish the configuration file (via `php artisan vendor:publish --tag=collaboration`) and set `sound_effects` to `false`.
+
+```php
+// config/collaboration.php
+
+return [
+    'sound_effects' => false,
+];
 ```
 
 ## Advanced Usage
