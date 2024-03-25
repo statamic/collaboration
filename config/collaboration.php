@@ -12,6 +12,6 @@ return [
     |
     */
 
-    'sound_effects' => false,
+    'sound_effects' => true,
 
 ];
