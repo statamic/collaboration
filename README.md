@@ -89,6 +89,22 @@ return [
 ];
 ```
 
+## Configuration
+
+### Sound Effects
+
+By default, the Collaboration addon plays sound effects when other users join & leave entries.
+
+If you wish to disable these, you may publish the configuration file (via `php artisan vendor:publish --tag=collaboration`) and set `sound_effects` to `false`.
+
+```php
+// config/collaboration.php
+
+return [
+    'sound_effects' => false,
+];
+```
+
 ## Advanced Usage
 
 When the ["meta data"](https://statamic.dev/extending/fieldtypes#meta-data) of a fieldtype is updated, it will be broadcast to the other users in the channel. If you have a fieldtype that contains a large amount of meta data, and it gets updated (some may just provide initial state and never change), you may consider specifying the fields that should be broadcast. This could help keep message sizes smaller and improve performance.
