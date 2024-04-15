@@ -1,7 +1,7 @@
 <!-- statamic:hide -->
 # Collaboration
 
-> Realtime collaboration and multi-user authoring for Statamic Pro.
+> Real-time collaboration and multi-user authoring for Statamic Pro.
 <!-- /statamic:hide -->
 
 ## Features
@@ -12,40 +12,81 @@
 
 ## Installation
 
-Require it using Composer, as well as the Pusher library.
+You can install and configure the Collaboration addon using a single command:
 
 ```
-composer require statamic/collaboration
-composer require pusher/pusher-php-server "^5.0"
+php please install:collaboration
 ```
 
-Uncomment `BroadcastServiceProvider` from `config/app.php`'s `providers` array if it isn't already.
+The command will install the `statamic/collaboration` addon, setup Laravel's broadcast scaffolding and prompt you to select which broadcast driver you wish to use.
 
-``` php
-'providers' => [
-    // ...
-    App\Providers\BroadcastServiceProvider::class,
-    // ...
-]
-```
+For more information on the specifics for each broadcast driver, please review the following:
 
-In your `.env` file, make sure the `pusher` broadcast driver is used:
+### Laravel Reverb
 
-```
-BROADCAST_DRIVER=pusher
-```
+The `install:collaboration` command will install Laravel Reverb into your application. After installation, run `php artisan reverb:start` to run Reverb's WebSockets server, then the Collaboration addon should start working in the Control Panel.
 
-Create an app inside your [Pusher account](https://pusher.com). 
+When you deploy your application to a server, you will need to run the Reverb WebSockets server as a daemon (`php artisan reverb:start`). If you're using Laravel Forge, there's a Reverb toggle in your site's "Application" panel.
 
-Be sure to enable the "Client Events" setting (under the "App Settings" page in your Pusher App Dashboard).
+For further information on Reverb, please review the [Laravel documentation](https://laravel.com/docs/master/reverb#introduction).
 
-Add your Pusher app credentials to your `.env` file:
+### Pusher
+
+The `install:collaboration` command will install [Pusher](https://pusher.com/)'s PHP SDK into your application. After installation, you should add your Pusher credentials to your `.env` file:
 
 ```
-PUSHER_APP_ID=
-PUSHER_APP_KEY=
-PUSHER_APP_SECRET=
-PUSHER_APP_CLUSTER=
+PUSHER_APP_ID="your-pusher-app-id"
+PUSHER_APP_KEY="your-pusher-key"
+PUSHER_APP_SECRET="your-pusher-secret"
+PUSHER_HOST=
+PUSHER_PORT=443
+PUSHER_SCHEME="https"
+PUSHER_APP_CLUSTER="mt1"
+```
+
+You should also ensure you have enabled the "Client Events" setting (found under the "App Settings" page in the Pusher Dashboard).
+
+### Other
+
+If you're planning on using a different broadcasting driver, there are a few additional steps you'll need to take to get it working:
+
+1. Install & configure your broadcasting driver (obviously)
+2. Update the `BROADCAST_DRIVER` in your `.env`
+3. Create a `resources/js/cp.js` file and add it to the Control Panel.
+    * [For more information, follow this guide on our documentation site](https://statamic.dev/extending/control-panel#adding-css-and-js-assets).
+4. In your `resources/js/cp.js` file, register a callback to override Statamic's [Echo](https://laravel.com/docs/10.x/broadcasting#client-side-installation) config:
+
+```js
+Statamic.booting(() => {
+    Statamic.$echo.config(() => ({
+        broadcaster: "pusher",
+        key: Statamic.$config.get('broadcasting.pusher.key'),
+        cluster: Statamic.$config.get('broadcasting.pusher.cluster'),
+        wsHost: Statamic.$config.get('broadcasting.pusher.host'),
+        wsPort: Statamic.$config.get('broadcasting.pusher.port'),
+        wssPort: Statamic.$config.get('broadcasting.pusher.port'),
+        forceTLS: false,
+        encrypted: true,
+        disableStats: true,
+        enabledTransports: ["ws", "wss"],
+    }));
+});
+```
+
+## Configuration
+
+### Sound Effects
+
+By default, the Collaboration addon plays sound effects when other users join & leave entries.
+
+If you wish to disable these, you may publish the configuration file (via `php artisan vendor:publish --tag=collaboration`) and set `sound_effects` to `false`.
+
+```php
+// config/collaboration.php
+
+return [
+    'sound_effects' => false,
+];
 ```
 
 ## Advanced Usage
