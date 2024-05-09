@@ -1,5 +1,13 @@
 # Release Notes
 
+## 1.0.0 (2023-05-09)
+
+### What's new
+- Statamic 5 support. [#95](https://github.com/statamic/collaboration/issues/95)
+- Ability to disable sound effects. [#95](https://github.com/statamic/collaboration/issues/96)
+
+
+
 ## 0.8.1 (2023-12-06)
 
 ### What's fixed
