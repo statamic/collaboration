@@ -30,6 +30,6 @@ class ServiceProvider extends AddonServiceProvider
                 'avatar' => $user->avatar(),
                 'initials' => $user->initials(),
             ];
-        });
+        }, ['guards' => [config('statamic.users.guards.cp')]]);
     }
 }
