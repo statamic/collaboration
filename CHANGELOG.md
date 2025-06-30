@@ -1,6 +1,14 @@
 # Release Notes
 
-## 1.0.0 (2023-05-09)
+## 1.0.1 (2025-06-30)
+
+### What's fixed
+- Uses the authentication guard defined in the `users` config file. [#107](https://github.com/statamic/collaboration/pull/107) by @tao
+- Use `ubuntu-latest` in GitHub Actions workflows [#104](https://github.com/statamic/collaboration/pull/104) by @duncanmcclean
+
+
+
+## 1.0.0 (2024-05-09)
 
 ### What's new
 - Statamic 5 support. [#95](https://github.com/statamic/collaboration/issues/95)
