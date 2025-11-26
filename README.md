@@ -1,11 +1,4 @@
 <!-- statamic:hide -->
-<p align="center">
-<picture>
-    <source srcset="https://statamic.com/assets/branding/squircle/statamic-logo-lime-white.svg" media="(prefers-color-scheme: dark)">
-    <img align="center" width="320" alt="Statamic Logo" src="https://statamic.com/assets/branding/squircle/statamic-logo-lime.svg">
-</picture>
-</p>
-
 # Collaboration
 
 > Real-time collaboration and multi-user authoring for Statamic Pro.
