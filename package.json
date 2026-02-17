@@ -1,15 +1,16 @@
 {
+    "type": "module",
     "private": true,
     "scripts": {
         "dev": "rm -rf resources/dist/build && vite",
         "build": "vite build"
     },
     "dependencies": {
-        "vue": "^2.6.11"
+        "vue": "^3.4.27"
     },
     "devDependencies": {
-        "@vitejs/plugin-vue2": "^2.2.0",
-        "laravel-vite-plugin": "^0.7.2",
-        "vite": "^4.5.2"
+        "@statamic/cms": "file:./vendor/statamic/cms/resources/dist-package",
+        "laravel-vite-plugin": "^2.0.0",
+        "vite": "^7.0.4"
     }
 }

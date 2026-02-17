@@ -4,8 +4,8 @@
     "description": "Real-time collaboration and multi-user authoring for Statamic Pro.",
     "license": "proprietary",
     "require": {
-        "statamic/cms": "^5.0",
-        "pixelfear/composer-dist-plugin": "^0.1.4"
+        "statamic/cms": "^6.0",
+        "pixelfear/composer-dist-plugin": "^0.1.6"
     },
     "extra": {
         "laravel": {
@@ -25,6 +25,11 @@
     "autoload": {
         "psr-4": {
             "Statamic\\Collaboration\\": "src"
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "pixelfear/composer-dist-plugin": true
         }
     }
 }
