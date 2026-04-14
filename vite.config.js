@@ -7,7 +7,6 @@ export default defineConfig({
     plugins: [
         statamic(),
         laravel({
-            valetTls: "sandbox.test",
             input: [
                 'resources/js/collaboration.js'
             ],
