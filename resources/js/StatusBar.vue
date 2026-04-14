@@ -40,7 +40,6 @@ const props = defineProps({
 const useStore = Statamic.$pinia.defineStore(`collaboration/${props.channelName}`, {
     state: () => ({
         users: [],
-        focus: {},
     }),
 });
 

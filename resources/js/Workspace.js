@@ -25,8 +25,7 @@ export default class Workspace {
 
         this.debouncedBroadcastValueChangeFuncsByHandle = {};
         this.unlockHandler = null;
-        this._fieldFocusedHandler = null;
-        this._fieldBlurredHandler = null;
+        this.focusWatcher = null;
     }
 
     start() {
@@ -46,15 +45,13 @@ export default class Workspace {
             this.valuesWatcher();
             this.valuesWatcher = null;
         }
+        if (this.focusWatcher) {
+            this.focusWatcher();
+            this.focusWatcher = null;
+        }
         if (this.unlockHandler) {
             Statamic.$events.$off(`collaboration.${this.channelName}.unlock`, this.unlockHandler);
             this.unlockHandler = null;
-        }
-        if (this._fieldFocusedHandler) {
-            Statamic.$events.$off('field:focused', this._fieldFocusedHandler);
-            Statamic.$events.$off('field:blurred', this._fieldBlurredHandler);
-            this._fieldFocusedHandler = null;
-            this._fieldBlurredHandler = null;
         }
         this.echo.leave(this.channelName);
     }
@@ -73,9 +70,9 @@ export default class Workspace {
             this.store.addUser(user);
             Statamic.$toast.success(`${user.name} has joined.`);
             this.whisper(`initialize-state-for-${user.id}`, {
-                values: this.container.container.values,
+                values: this.container.values.value,
                 meta: {},
-                focus: this.store.focus,
+                focus: this.container.fieldFocus.value,
             });
 
             if (Statamic.$config.get('collaboration.sound_effects')) {
@@ -86,7 +83,7 @@ export default class Workspace {
         this.channel.leaving(user => {
             this.store.removeUser(user);
             Statamic.$toast.success(`${user.name} has left.`);
-            this.blurAndUnlock(user);
+            this.blur(user);
 
             if (Statamic.$config.get('collaboration.sound_effects')) {
                 this.playAudio('buddy-out');
@@ -104,19 +101,19 @@ export default class Workspace {
         this.listenForWhisper(`initialize-state-for-${this.user.id}`, payload => {
             if (this.initialStateUpdated) return;
             this.debug('✅ Applying broadcasted state change', payload);
-            this.container.container.setValues(payload.values);
-            Object.entries(payload.focus).forEach(([, { user, handle }]) => this.focusAndLock(user, handle));
+            this.container.setValues(payload.values);
+            Object.entries(payload.focus).forEach(([, { user, handle }]) => this.focus(user, handle));
             this.initialStateUpdated = true;
         });
 
         this.listenForWhisper('focus', ({ user, handle }) => {
             this.debug(`Heard that user has changed focus`, { user, handle });
-            this.focusAndLock(user, handle);
+            this.focus(user, handle);
         });
 
         this.listenForWhisper('blur', ({ user, handle }) => {
             this.debug(`Heard that user has blurred`, { user, handle });
-            this.blurAndUnlock(user, handle);
+            this.blur(user, handle);
         });
 
         this.listenForWhisper('force-unlock', ({ targetUser, originUser }) => {
@@ -125,8 +122,7 @@ export default class Workspace {
             if (targetUser.id !== this.user.id) return;
 
             document.activeElement.blur();
-            this.blurAndUnlock(this.user);
-            this.whisper('blur', { user: this.user });
+            this.blur(this.user);
             Statamic.$toast.info(`${originUser.name} has unlocked your editor.`, { duration: false });
         });
 
@@ -160,7 +156,6 @@ export default class Workspace {
         const useStore = Statamic.$pinia.defineStore(`collaboration/${channelName}`, {
             state: () => ({
                 users: [],
-                focus: {},
             }),
             actions: {
                 setUsers(users) {
@@ -172,12 +167,6 @@ export default class Workspace {
                 removeUser(removedUser) {
                     this.users = this.users.filter(user => user.id !== removedUser.id);
                 },
-                setFocus(handle, user) {
-                    this.focus[user.id] = { handle, user };
-                },
-                clearFocus(user) {
-                    delete this.focus[user.id];
-                },
             },
         });
 
@@ -185,7 +174,7 @@ export default class Workspace {
     }
 
     initializeStatusBar() {
-        this.container.container.pushComponent('CollaborationStatusBar', {
+        this.container.pushComponent('CollaborationStatusBar', {
             props: {
                 channelName: this.channelName,
             }
@@ -198,20 +187,17 @@ export default class Workspace {
     }
 
     initializeFocusBlur() {
-        this._fieldFocusedHandler = ({ containerName, handle }) => {
-            if (containerName !== this.container.name) return;
-            this.focusAndLock(this.user, handle);
-            this.whisper('focus', { user: this.user, handle });
-        };
-
-        this._fieldBlurredHandler = ({ containerName, handle }) => {
-            if (containerName !== this.container.name) return;
-            this.blurAndUnlock(this.user, handle);
-            this.whisper('blur', { user: this.user, handle });
-        };
-
-        Statamic.$events.$on('field:focused', this._fieldFocusedHandler);
-        Statamic.$events.$on('field:blurred', this._fieldBlurredHandler);
+        this.focusWatcher = watch(
+            () => this.container.fieldFocus.value[this.user.id]?.handle,
+            (newHandle, oldHandle) => {
+                if (oldHandle) {
+                    this.whisper('blur', { user: this.user, handle: oldHandle });
+                }
+                if (newHandle) {
+                    this.whisper('focus', { user: this.user, handle: newHandle });
+                }
+            }
+        );
     }
 
     initializeHooks() {
@@ -239,30 +225,20 @@ export default class Workspace {
     }
 
     focus(user, handle) {
-        this.store.setFocus(handle, user);
+        this.container.focusField(handle, user);
     }
 
-    focusAndLock(user, handle) {
-        this.focus(user, handle);
-        Statamic.$events.$emit('field:lock', { containerName: this.container.name, handle, user });
-    }
-
-    blur(user) {
-        this.store.clearFocus(user);
-    }
-
-    blurAndUnlock(user, handle = null) {
-        handle = handle || data_get(this.store.focus, `${user.id}.handle`);
+    blur(user, handle = null) {
+        handle = handle || this.container.fieldFocus.value[user.id]?.handle;
         if (!handle) return;
-        this.blur(user);
-        Statamic.$events.$emit('field:unlock', { containerName: this.container.name, handle });
+        this.container.blurField(handle, user);
     }
 
     initializeValueWatcher() {
         if (this.valuesWatcher) return;
 
         this.valuesWatcher = watch(
-            () => this.container.container.values,
+            this.container.values,
             (newValues) => {
                 Object.keys(newValues).forEach(handle => {
                     const newValue = newValues[handle];
@@ -312,7 +288,7 @@ export default class Workspace {
     applyBroadcastedValueChange(payload) {
         this.debug('✅ Applying broadcasted value change', payload);
         this.rememberValueChange(payload.handle, payload.value);
-        this.container.container.setFieldValue(payload.handle, payload.value);
+        this.container.setFieldValue(payload.handle, payload.value);
     }
 
     applyBroadcastedMetaChange(payload) {
@@ -395,7 +371,7 @@ export default class Workspace {
     }
 
     initializeValuesAndMeta() {
-        this.lastValues = clone(this.container.container.values);
+        this.lastValues = clone(this.container.values.value);
         this.lastMetaValues = {};
     }
 }
