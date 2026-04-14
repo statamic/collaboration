@@ -1,5 +1,14 @@
+import { watch } from 'vue';
 import buddyIn from '../audio/buddy-in.mp3'
 import buddyOut from '../audio/buddy-out.mp3'
+
+function debounce(fn, delay) {
+    let timer;
+    return function (...args) {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn.apply(this, args), delay);
+    };
+}
 
 export default class Workspace {
 
@@ -7,14 +16,17 @@ export default class Workspace {
         this.container = container;
         this.echo = null;
         this.started = false;
-        this.storeSubscriber = null;
+        this.valuesWatcher = null;
+        this.store = null;
         this.lastValues = {};
         this.lastMetaValues = {};
         this.user = Statamic.user;
         this.initialStateUpdated = false;
 
         this.debouncedBroadcastValueChangeFuncsByHandle = {};
-        this.debouncedBroadcastMetaChangeFuncsByHandle = {};
+        this.unlockHandler = null;
+        this._fieldFocusedHandler = null;
+        this._fieldBlurredHandler = null;
     }
 
     start() {
@@ -22,15 +34,28 @@ export default class Workspace {
 
         this.initializeEcho();
         this.initializeStore();
-        this.initializeFocus();
         this.initializeValuesAndMeta();
         this.initializeHooks();
         this.initializeStatusBar();
+        this.initializeFocusBlur();
         this.started = true;
     }
 
     destroy() {
-        this.storeSubscriber.apply();
+        if (this.valuesWatcher) {
+            this.valuesWatcher();
+            this.valuesWatcher = null;
+        }
+        if (this.unlockHandler) {
+            Statamic.$events.$off(`collaboration.${this.channelName}.unlock`, this.unlockHandler);
+            this.unlockHandler = null;
+        }
+        if (this._fieldFocusedHandler) {
+            Statamic.$events.$off('field:focused', this._fieldFocusedHandler);
+            Statamic.$events.$off('field:blurred', this._fieldBlurredHandler);
+            this._fieldFocusedHandler = null;
+            this._fieldBlurredHandler = null;
+        }
         this.echo.leave(this.channelName);
     }
 
@@ -40,17 +65,17 @@ export default class Workspace {
         this.channel = this.echo.join(this.channelName);
 
         this.channel.here(users => {
-            this.subscribeToVuexMutations();
-            Statamic.$store.commit(`collaboration/${this.channelName}/setUsers`, users);
+            this.initializeValueWatcher();
+            this.store.setUsers(users);
         });
 
         this.channel.joining(user => {
-            Statamic.$store.commit(`collaboration/${this.channelName}/addUser`, user);
+            this.store.addUser(user);
             Statamic.$toast.success(`${user.name} has joined.`);
             this.whisper(`initialize-state-for-${user.id}`, {
-                values: Statamic.$store.state.publish[this.container.name].values,
-                meta: this.cleanEntireMetaPayload(Statamic.$store.state.publish[this.container.name].meta),
-                focus: Statamic.$store.state.collaboration[this.channelName].focus,
+                values: this.container.container.values,
+                meta: {},
+                focus: this.store.focus,
             });
 
             if (Statamic.$config.get('collaboration.sound_effects')) {
@@ -59,7 +84,7 @@ export default class Workspace {
         });
 
         this.channel.leaving(user => {
-            Statamic.$store.commit(`collaboration/${this.channelName}/removeUser`, user);
+            this.store.removeUser(user);
             Statamic.$toast.success(`${user.name} has left.`);
             this.blurAndUnlock(user);
 
@@ -79,9 +104,8 @@ export default class Workspace {
         this.listenForWhisper(`initialize-state-for-${this.user.id}`, payload => {
             if (this.initialStateUpdated) return;
             this.debug('✅ Applying broadcasted state change', payload);
-            Statamic.$store.dispatch(`publish/${this.container.name}/setValues`, payload.values);
-            Statamic.$store.dispatch(`publish/${this.container.name}/setMeta`, this.restoreEntireMetaPayload(payload.meta));
-            _.each(payload.focus, ({ user, handle }) => this.focusAndLock(user, handle));
+            this.container.container.setValues(payload.values);
+            Object.entries(payload.focus).forEach(([, { user, handle }]) => this.focusAndLock(user, handle));
             this.initialStateUpdated = true;
         });
 
@@ -118,7 +142,7 @@ export default class Workspace {
             Statamic.$components.append('CollaborationBlockingNotification', {
                 props: { message: messageProp }
             }).on('confirm', () => window.location.reload());
-            this.destroy(); // Stop listening to anything else.
+            this.destroy();
         });
 
         this.listenForWhisper('revision-restored', ({ user }) => {
@@ -126,48 +150,68 @@ export default class Workspace {
             Statamic.$components.append('CollaborationBlockingNotification', {
                 props: { message: `Entry has been restored to another revision by ${user.name}` }
             }).on('confirm', () => window.location.reload());
-            this.destroy(); // Stop listening to anything else.
+            this.destroy();
         });
     }
 
     initializeStore() {
-        Statamic.$store.registerModule(['collaboration', this.channelName], {
-            namespaced: true,
-            state: {
+        const channelName = this.channelName;
+
+        const useStore = Statamic.$pinia.defineStore(`collaboration/${channelName}`, {
+            state: () => ({
                 users: [],
                 focus: {},
+            }),
+            actions: {
+                setUsers(users) {
+                    this.users = users;
+                },
+                addUser(user) {
+                    this.users.push(user);
+                },
+                removeUser(removedUser) {
+                    this.users = this.users.filter(user => user.id !== removedUser.id);
+                },
+                setFocus(handle, user) {
+                    this.focus[user.id] = { handle, user };
+                },
+                clearFocus(user) {
+                    delete this.focus[user.id];
+                },
             },
-            mutations: {
-                setUsers(state, users) {
-                    state.users = users;
-                },
-                addUser(state, user) {
-                    state.users.push(user);
-                },
-                removeUser(state, removedUser) {
-                    state.users = state.users.filter(user => user.id !== removedUser.id);
-                },
-                focus(state, { handle, user }) {
-                    Vue.set(state.focus, user.id, { handle, user });
-                },
-                blur(state, user) {
-                    Vue.delete(state.focus, user.id);
-                }
-            }
         });
+
+        this.store = useStore();
     }
 
     initializeStatusBar() {
-        const component = this.container.pushComponent('CollaborationStatusBar', {
+        this.container.container.pushComponent('CollaborationStatusBar', {
             props: {
                 channelName: this.channelName,
-                connecting: this.connecting,
             }
         });
 
-        component.on('unlock', (targetUser) => {
+        this.unlockHandler = (targetUser) => {
             this.whisper('force-unlock', { targetUser, originUser: this.user });
-        });
+        };
+        Statamic.$events.$on(`collaboration.${this.channelName}.unlock`, this.unlockHandler);
+    }
+
+    initializeFocusBlur() {
+        this._fieldFocusedHandler = ({ containerName, handle }) => {
+            if (containerName !== this.container.name) return;
+            this.focusAndLock(this.user, handle);
+            this.whisper('focus', { user: this.user, handle });
+        };
+
+        this._fieldBlurredHandler = ({ containerName, handle }) => {
+            if (containerName !== this.container.name) return;
+            this.blurAndUnlock(this.user, handle);
+            this.whisper('blur', { user: this.user, handle });
+        };
+
+        Statamic.$events.$on('field:focused', this._fieldFocusedHandler);
+        Statamic.$events.$on('field:blurred', this._fieldBlurredHandler);
     }
 
     initializeHooks() {
@@ -190,120 +234,68 @@ export default class Workspace {
 
             this.whisper('revision-restored', { user: this.user });
 
-            // Echo doesn't give us a promise, so wait half a second before resolving.
-            // That should be enough time for the whisper to be sent before the the page refreshes.
             setTimeout(resolve, 500);
         });
     }
 
-    initializeFocus() {
-        this.container.$on('focus', handle => {
-            const user = this.user;
-            this.focus(user, handle);
-            this.whisper('focus', { user, handle });
-        });
-        this.container.$on('blur', handle => {
-            const user = this.user;
-            this.blur(user, handle);
-            this.whisper('blur', { user, handle });
-        });
-    }
-
     focus(user, handle) {
-        Statamic.$store.commit(`collaboration/${this.channelName}/focus`, { user, handle });
+        this.store.setFocus(handle, user);
     }
 
     focusAndLock(user, handle) {
         this.focus(user, handle);
-        Statamic.$store.commit(`publish/${this.container.name}/lockField`, { user, handle });
+        Statamic.$events.$emit('field:lock', { containerName: this.container.name, handle, user });
     }
 
     blur(user) {
-        Statamic.$store.commit(`collaboration/${this.channelName}/blur`, user);
+        this.store.clearFocus(user);
     }
 
     blurAndUnlock(user, handle = null) {
-        handle = handle || data_get(Statamic.$store.state.collaboration[this.channelName], `focus.${user.id}.handle`);
+        handle = handle || data_get(this.store.focus, `${user.id}.handle`);
         if (!handle) return;
         this.blur(user);
-        Statamic.$store.commit(`publish/${this.container.name}/unlockField`, handle);
+        Statamic.$events.$emit('field:unlock', { containerName: this.container.name, handle });
     }
 
-    subscribeToVuexMutations() {
-        this.storeSubscriber = Statamic.$store.subscribe((mutation, state) => {
-            switch (mutation.type) {
-                case `publish/${this.container.name}/setFieldValue`:
-                    this.vuexFieldValueHasBeenSet(mutation.payload);
-                    break;
-                case `publish/${this.container.name}/setFieldMeta`:
-                    this.vuexFieldMetaHasBeenSet(mutation.payload);
-                    break;
-            }
-        });
-    }
+    initializeValueWatcher() {
+        if (this.valuesWatcher) return;
 
-    // A field's value has been set in the vuex store.
-    // It could have been triggered by the current user editing something,
-    // or by the workspace applying a change dispatched by another user editing something.
-    vuexFieldValueHasBeenSet(payload) {
-        this.debug('Vuex field value has been set', payload);
-        if (!this.valueHasChanged(payload.handle, payload.value)) {
-            // No change? Don't bother doing anything.
-            this.debug(`Value for ${payload.handle} has not changed.`, { value: payload.value, lastValue: this.lastValues[payload.handle] });
-            return;
-        }
-
-        this.rememberValueChange(payload.handle, payload.value);
-        this.debouncedBroadcastValueChangeFuncByHandle(payload.handle)(payload);
-    }
-
-    // A field's meta value has been set in the vuex store.
-    // It could have been triggered by the current user editing something,
-    // or by the workspace applying a change dispatched by another user editing something.
-    vuexFieldMetaHasBeenSet(payload) {
-        this.debug('Vuex field meta has been set', payload);
-        if (!this.metaHasChanged(payload.handle, payload.value)) {
-            // No change? Don't bother doing anything.
-            this.debug(`Meta for ${payload.handle} has not changed.`, { value: payload.value, lastValue: this.lastMetaValues[payload.handle] });
-            return;
-        }
-
-        this.rememberMetaChange(payload.handle, payload.value);
-        this.debouncedBroadcastMetaChangeFuncByHandle(payload.handle)(payload);
+        this.valuesWatcher = watch(
+            () => this.container.container.values,
+            (newValues) => {
+                Object.keys(newValues).forEach(handle => {
+                    const newValue = newValues[handle];
+                    if (this.valueHasChanged(handle, newValue)) {
+                        this.rememberValueChange(handle, newValue);
+                        this.debouncedBroadcastValueChangeFuncByHandle(handle)({
+                            handle,
+                            value: newValue,
+                            user: this.user.id,
+                        });
+                    }
+                });
+            },
+            { deep: true }
+        );
     }
 
     rememberValueChange(handle, value) {
-        this.debug('Remembering value change', { handle, value });
         this.lastValues[handle] = clone(value);
     }
 
     rememberMetaChange(handle, value) {
-        this.debug('Remembering meta change', { handle, value });
         this.lastMetaValues[handle] = clone(value);
     }
 
     debouncedBroadcastValueChangeFuncByHandle(handle) {
-        // use existing debounced function if one already exists
         const func = this.debouncedBroadcastValueChangeFuncsByHandle[handle];
         if (func) return func;
 
-        // if the handle has no debounced broadcast function yet, create one and return it
-        this.debouncedBroadcastValueChangeFuncsByHandle[handle] = _.debounce((payload) => {
+        this.debouncedBroadcastValueChangeFuncsByHandle[handle] = debounce((payload) => {
             this.broadcastValueChange(payload);
         }, 500);
         return this.debouncedBroadcastValueChangeFuncsByHandle[handle];
-    }
-
-    debouncedBroadcastMetaChangeFuncByHandle(handle) {
-        // use existing debounced function if one already exists
-        const func = this.debouncedBroadcastMetaChangeFuncsByHandle[handle];
-        if (func) return func;
-
-        // if the handle has no debounced broadcast function yet, create one and return it
-        this.debouncedBroadcastMetaChangeFuncsByHandle[handle] = _.debounce((payload) => {
-            this.broadcastMetaChange(payload);
-        }, 500);
-        return this.debouncedBroadcastMetaChangeFuncsByHandle[handle];
     }
 
     valueHasChanged(handle, newValue) {
@@ -311,77 +303,30 @@ export default class Workspace {
         return JSON.stringify(lastValue) !== JSON.stringify(newValue);
     }
 
-    metaHasChanged(handle, newValue) {
-        const lastValue = this.lastMetaValues[handle] || null;
-        return JSON.stringify(lastValue) !== JSON.stringify(newValue);
-    }
-
     broadcastValueChange(payload) {
-        // Only my own change events should be broadcasted. Otherwise when other users receive
-        // the broadcast, it will be re-broadcasted, and so on, to infinity and beyond.
         if (this.user.id == payload.user) {
             this.whisper('updated', payload);
         }
     }
 
-    broadcastMetaChange(payload) {
-        // Only my own change events should be broadcasted. Otherwise when other users receive
-        // the broadcast, it will be re-broadcasted, and so on, to infinity and beyond.
-        if (this.user.id == payload.user) {
-            this.whisper('meta-updated', this.cleanMetaPayload(payload));
-        }
-    }
-
-    // Allow fieldtypes to provide an array of keys that will be broadcasted.
-    // For example, in Bard, only the "existing" value in its meta object
-    // ever gets updated. We'll just broadcast that, rather than the
-    // whole thing, which would be wasted bytes in the message.
-    cleanMetaPayload(payload) {
-        const allowed = data_get(payload, 'value.__collaboration');
-        if (! allowed) return payload;
-        let allowedValues = {};
-        allowed.forEach(key => allowedValues[key] = payload.value[key]);
-        payload.value = allowedValues;
-        return payload;
-    }
-
-    // Similar to cleanMetaPayload, except for when dealing with the
-    // entire list of fields' meta values. Used when a user joins
-    // and needs to receive everything in one fell swoop.
-    cleanEntireMetaPayload(values) {
-        return _.mapObject(values, meta => {
-            const allowed = data_get(meta, '__collaboration');
-            if (!allowed) return meta;
-            let allowedValues = {};
-            allowed.forEach(key => allowedValues[key] = meta[key]);
-            return allowedValues;
-        });
-    }
-
-    restoreEntireMetaPayload(payload) {
-        return _.mapObject(payload, (value, key) => {
-            return {...this.lastMetaValues[key], ...value};
-        });
-    }
-
     applyBroadcastedValueChange(payload) {
         this.debug('✅ Applying broadcasted value change', payload);
-        Statamic.$store.dispatch(`publish/${this.container.name}/setFieldValue`, payload);
+        this.rememberValueChange(payload.handle, payload.value);
+        this.container.container.setFieldValue(payload.handle, payload.value);
     }
 
     applyBroadcastedMetaChange(payload) {
         this.debug('✅ Applying broadcasted meta change', payload);
-        let value = {...this.lastMetaValues[payload.handle], ...payload.value};
-        payload.value = value;
-        Statamic.$store.dispatch(`publish/${this.container.name}/setFieldMeta`, payload);
+        let value = { ...this.lastMetaValues[payload.handle], ...payload.value };
+        this.rememberMetaChange(payload.handle, value);
     }
 
     debug(message, args) {
-        console.log('[Collaboration]', message, {...args});
+        console.log('[Collaboration]', message, { ...args });
     }
 
     isAlone() {
-        return Statamic.$store.state.collaboration[this.channelName].users.length === 1;
+        return this.store.users.length === 1;
     }
 
     whisper(event, payload) {
@@ -416,7 +361,7 @@ export default class Workspace {
 
         let events = {};
         this.channel.listenForWhisper(`chunked-${event}`, data => {
-            if (! events.hasOwnProperty(data.id)) {
+            if (!events.hasOwnProperty(data.id)) {
                 events[data.id] = { chunks: [], receivedFinal: false };
             }
 
@@ -450,7 +395,7 @@ export default class Workspace {
     }
 
     initializeValuesAndMeta() {
-        this.lastValues = clone(Statamic.$store.state.publish[this.container.name].values);
-        this.lastMetaValues = clone(Statamic.$store.state.publish[this.container.name].meta);
+        this.lastValues = clone(this.container.container.values);
+        this.lastMetaValues = {};
     }
 }
