@@ -12,6 +12,7 @@ Statamic.booting(() => {
 Statamic.$events.$on('publish-container-created', (container) => {
     if (!container.reference) return;
     manager.addWorkspace(container);
+    window.addEventListener('unload', () => manager.destroyWorkspace(container));
 });
 
 Statamic.$events.$on('publish-container-destroyed', (container) => {
