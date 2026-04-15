@@ -137,7 +137,7 @@ export default class Workspace {
             Statamic.$components.append('CollaborationBlockingNotification', {
                 props: { message: messageProp }
             }).on('confirm', () => window.location.reload());
-            this.destroy();
+            this.destroy(); // Stop listening to anything else.
         });
 
         this.listenForWhisper('revision-restored', ({ user }) => {
@@ -145,7 +145,7 @@ export default class Workspace {
             Statamic.$components.append('CollaborationBlockingNotification', {
                 props: { message: `Entry has been restored to another revision by ${user.name}` }
             }).on('confirm', () => window.location.reload());
-            this.destroy();
+            this.destroy(); // Stop listening to anything else.
         });
     }
 
@@ -199,6 +199,8 @@ export default class Workspace {
 
             this.whisper('revision-restored', { user: this.user });
 
+            // Echo doesn't give us a promise, so wait half a second before resolving.
+            // That should be enough time for the whisper to be sent before the the page refreshes.
             setTimeout(resolve, 500);
         });
     }
@@ -258,17 +260,21 @@ export default class Workspace {
     }
 
     rememberValueChange(handle, value) {
+        this.debug('Remembering value change', { handle, value });
         this.lastValues[handle] = clone(value);
     }
 
     rememberMetaChange(handle, value) {
+        this.debug('Remembering meta change', { handle, value });
         this.lastMetaValues[handle] = clone(value);
     }
 
     debouncedBroadcastValueChangeFuncByHandle(handle) {
+        // use existing debounced function if one already exists
         const func = this.debouncedBroadcastValueChangeFuncsByHandle[handle];
         if (func) return func;
 
+        // if the handle has no debounced broadcast function yet, create one and return it
         this.debouncedBroadcastValueChangeFuncsByHandle[handle] = debounce((payload) => {
             this.broadcastValueChange(payload);
         }, 500);
@@ -276,6 +282,7 @@ export default class Workspace {
     }
 
     debouncedBroadcastMetaChangeFuncByHandle(handle) {
+        // use existing debounced function if one already exists
         const func = this.debouncedBroadcastMetaChangeFuncsByHandle[handle];
         if (func) return func;
 
@@ -296,17 +303,25 @@ export default class Workspace {
     }
 
     broadcastValueChange(payload) {
+        // Only my own change events should be broadcasted. Otherwise when other users receive
+        // the broadcast, it will be re-broadcasted, and so on, to infinity and beyond.
         if (this.user.id == payload.user) {
             this.whisper('updated', payload);
         }
     }
 
     broadcastMetaChange(payload) {
+        // Only my own change events should be broadcasted. Otherwise when other users receive
+        // the broadcast, it will be re-broadcasted, and so on, to infinity and beyond.
         if (this.user.id == payload.user) {
             this.whisper('meta-updated', this.cleanMetaPayload(payload));
         }
     }
 
+    // Allow fieldtypes to provide an array of keys that will be broadcasted.
+    // For example, in Bard, only the "existing" value in its meta object
+    // ever gets updated. We'll just broadcast that, rather than the
+    // whole thing, which would be wasted bytes in the message.
     cleanMetaPayload(payload) {
         const allowed = payload?.value?.__collaboration;
         if (!allowed) return payload;
@@ -317,6 +332,16 @@ export default class Workspace {
         });
 
         return { ...payload, value: allowedValues };
+    }
+
+    // Similar to cleanMetaPayload, except for when dealing with the
+    // entire list of fields' meta values. Used when a user joins
+    // and needs to receive everything in one fell swoop.
+    cleanEntireMetaPayload(meta = {}) {
+        return Object.entries(meta).reduce((cleaned, [handle, value]) => {
+            cleaned[handle] = this.cleanMetaPayload({ handle, value }).value;
+            return cleaned;
+        }, {});
     }
 
     restoreEntireMetaPayload(payload) {
@@ -340,7 +365,7 @@ export default class Workspace {
     }
 
     debug(message, args) {
-        console.log('[Collaboration]', message, { ...args });
+        console.log('[Collaboration]', message, {...args});
     }
 
     isAlone() {
@@ -379,7 +404,7 @@ export default class Workspace {
 
         let events = {};
         this.channel.listenForWhisper(`chunked-${event}`, data => {
-            if (!events.hasOwnProperty(data.id)) {
+            if (! events.hasOwnProperty(data.id)) {
                 events[data.id] = { chunks: [], receivedFinal: false };
             }
 
