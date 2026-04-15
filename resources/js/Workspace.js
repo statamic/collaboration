@@ -10,6 +10,7 @@ export default class Workspace {
         this.echo = null;
         this.started = false;
         this.valuesWatcher = null;
+        this.metaWatcher = null;
         this.store = null;
         this.lastValues = {};
         this.lastMetaValues = {};
@@ -17,6 +18,7 @@ export default class Workspace {
         this.initialStateUpdated = false;
 
         this.debouncedBroadcastValueChangeFuncsByHandle = {};
+        this.debouncedBroadcastMetaChangeFuncsByHandle = {};
         this.focusWatcher = null;
     }
 
@@ -37,6 +39,10 @@ export default class Workspace {
             this.valuesWatcher();
             this.valuesWatcher = null;
         }
+        if (this.metaWatcher) {
+            this.metaWatcher();
+            this.metaWatcher = null;
+        }
         if (this.focusWatcher) {
             this.focusWatcher();
             this.focusWatcher = null;
@@ -51,6 +57,7 @@ export default class Workspace {
 
         this.channel.here(users => {
             this.initializeValueWatcher();
+            this.initializeMetaWatcher();
             this.store.setUsers(users);
         });
 
@@ -59,7 +66,7 @@ export default class Workspace {
             Statamic.$toast.success(`${user.name} has joined.`);
             this.whisper(`initialize-state-for-${user.id}`, {
                 values: this.container.values.value,
-                meta: {},
+                meta: this.container.meta.value,
                 focus: this.container.fieldFocus.value,
             });
 
@@ -90,6 +97,9 @@ export default class Workspace {
             if (this.initialStateUpdated) return;
             this.debug('✅ Applying broadcasted state change', payload);
             this.container.setValues(payload.values);
+            Object.entries(payload.meta).forEach(([handle, value]) => {
+                this.applyBroadcastedMetaChange({ handle, value });
+            });
             Object.entries(payload.focus).forEach(([, { user, handle }]) => this.focus(user, handle));
             this.initialStateUpdated = true;
         });
@@ -243,6 +253,28 @@ export default class Workspace {
         );
     }
 
+    initializeMetaWatcher() {
+        if (this.metaWatcher || !this.container.meta) return;
+
+        this.metaWatcher = watch(
+            this.container.meta,
+            (newMeta) => {
+                Object.keys(newMeta).forEach(handle => {
+                    const newValue = newMeta[handle];
+                    if (this.metaHasChanged(handle, newValue)) {
+                        this.rememberMetaChange(handle, newValue);
+                        this.debouncedBroadcastMetaChangeFuncByHandle(handle)({
+                            handle,
+                            value: newValue,
+                            user: this.user.id,
+                        });
+                    }
+                });
+            },
+            { deep: true }
+        );
+    }
+
     rememberValueChange(handle, value) {
         this.lastValues[handle] = clone(value);
     }
@@ -261,8 +293,23 @@ export default class Workspace {
         return this.debouncedBroadcastValueChangeFuncsByHandle[handle];
     }
 
+    debouncedBroadcastMetaChangeFuncByHandle(handle) {
+        const func = this.debouncedBroadcastMetaChangeFuncsByHandle[handle];
+        if (func) return func;
+
+        this.debouncedBroadcastMetaChangeFuncsByHandle[handle] = debounce((payload) => {
+            this.broadcastMetaChange(payload);
+        }, 500);
+        return this.debouncedBroadcastMetaChangeFuncsByHandle[handle];
+    }
+
     valueHasChanged(handle, newValue) {
         const lastValue = this.lastValues[handle] || null;
+        return JSON.stringify(lastValue) !== JSON.stringify(newValue);
+    }
+
+    metaHasChanged(handle, newValue) {
+        const lastValue = this.lastMetaValues[handle] || null;
         return JSON.stringify(lastValue) !== JSON.stringify(newValue);
     }
 
@@ -270,6 +317,24 @@ export default class Workspace {
         if (this.user.id == payload.user) {
             this.whisper('updated', payload);
         }
+    }
+
+    broadcastMetaChange(payload) {
+        if (this.user.id == payload.user) {
+            this.whisper('meta-updated', this.cleanMetaPayload(payload));
+        }
+    }
+
+    cleanMetaPayload(payload) {
+        const allowed = payload?.value?.__collaboration;
+        if (!allowed) return payload;
+
+        const allowedValues = {};
+        allowed.forEach(key => {
+            allowedValues[key] = payload.value[key];
+        });
+
+        return { ...payload, value: allowedValues };
     }
 
     applyBroadcastedValueChange(payload) {
@@ -282,6 +347,7 @@ export default class Workspace {
         this.debug('✅ Applying broadcasted meta change', payload);
         let value = { ...this.lastMetaValues[payload.handle], ...payload.value };
         this.rememberMetaChange(payload.handle, value);
+        this.container.setFieldMeta(payload.handle, value);
     }
 
     debug(message, args) {
@@ -359,6 +425,6 @@ export default class Workspace {
 
     initializeValuesAndMeta() {
         this.lastValues = clone(this.container.values.value);
-        this.lastMetaValues = {};
+        this.lastMetaValues = clone(this.container.meta?.value || {});
     }
 }
