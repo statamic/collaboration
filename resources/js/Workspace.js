@@ -1,14 +1,7 @@
 import { watch } from 'vue';
+import { debounce } from '@statamic/cms';
 import buddyIn from '../audio/buddy-in.mp3'
 import buddyOut from '../audio/buddy-out.mp3'
-
-function debounce(fn, delay) {
-    let timer;
-    return function (...args) {
-        clearTimeout(timer);
-        timer = setTimeout(() => fn.apply(this, args), delay);
-    };
-}
 
 export default class Workspace {
 
