@@ -8,6 +8,11 @@ Statamic.booting(() => {
     Statamic.$components.register('CollaborationBlockingNotification', BlockingNotification);
 });
 
+Statamic.$echo.booted(Echo => {
+    manager.echo = Echo;
+    manager.boot();
+});
+
 Statamic.$events.$on('publish-container-created', container => {
     if (!container.reference) return;
     manager.addWorkspace(container);
@@ -17,9 +22,4 @@ Statamic.$events.$on('publish-container-created', container => {
 Statamic.$events.$on('publish-container-destroyed', container => {
     if (!manager.workspaces[container.name]) return;
     manager.destroyWorkspace(container);
-});
-
-Statamic.$echo.booted(Echo => {
-    manager.echo = Echo;
-    manager.boot();
 });
