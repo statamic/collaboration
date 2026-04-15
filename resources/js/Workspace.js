@@ -98,9 +98,9 @@ export default class Workspace {
             if (this.initialStateUpdated) return;
             this.debug('✅ Applying broadcasted state change', payload);
             this.container.setValues(payload.values);
-            Object.entries(payload.meta).forEach(([handle, value]) => {
-                this.applyBroadcastedMetaChange({ handle, value });
-            });
+            const restoredMeta = this.restoreEntireMetaPayload(payload.meta || {});
+            this.container.setMeta(restoredMeta);
+            this.lastMetaValues = clone(restoredMeta);
             Object.entries(payload.focus).forEach(([, { user, handle }]) => this.focus(user, handle));
             this.initialStateUpdated = true;
         });
@@ -317,6 +317,13 @@ export default class Workspace {
         });
 
         return { ...payload, value: allowedValues };
+    }
+
+    restoreEntireMetaPayload(payload) {
+        return Object.entries(payload).reduce((restored, [handle, value]) => {
+            restored[handle] = { ...(this.lastMetaValues[handle] || {}), ...value };
+            return restored;
+        }, {});
     }
 
     applyBroadcastedValueChange(payload) {
