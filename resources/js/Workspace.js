@@ -286,6 +286,7 @@ export default class Workspace {
         const func = this.debouncedBroadcastMetaChangeFuncsByHandle[handle];
         if (func) return func;
 
+        // if the handle has no debounced broadcast function yet, create one and return it
         this.debouncedBroadcastMetaChangeFuncsByHandle[handle] = debounce((payload) => {
             this.broadcastMetaChange(payload);
         }, 500);
@@ -323,22 +324,19 @@ export default class Workspace {
     // ever gets updated. We'll just broadcast that, rather than the
     // whole thing, which would be wasted bytes in the message.
     cleanMetaPayload(payload) {
-        const allowed = payload?.value?.__collaboration;
-        if (!allowed) return payload;
-
-        const allowedValues = {};
-        allowed.forEach(key => {
-            allowedValues[key] = payload.value[key];
-        });
-
-        return { ...payload, value: allowedValues };
+        const allowed = data_get(payload, 'value.__collaboration');
+        if (! allowed) return payload;
+        let allowedValues = {};
+        allowed.forEach(key => allowedValues[key] = payload.value[key]);
+        payload.value = allowedValues;
+        return payload;
     }
 
     // Similar to cleanMetaPayload, except for when dealing with the
     // entire list of fields' meta values. Used when a user joins
     // and needs to receive everything in one fell swoop.
-    cleanEntireMetaPayload(meta = {}) {
-        return Object.entries(meta).reduce((cleaned, [handle, value]) => {
+    cleanEntireMetaPayload(values) {
+        return Object.entries(values).reduce((cleaned, [handle, value]) => {
             cleaned[handle] = this.cleanMetaPayload({ handle, value }).value;
             return cleaned;
         }, {});
