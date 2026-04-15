@@ -2,6 +2,7 @@ import { watch } from 'vue';
 import { debounce } from '@statamic/cms';
 import buddyIn from '../audio/buddy-in.mp3'
 import buddyOut from '../audio/buddy-out.mp3'
+import { useCollaborationStore } from './store';
 
 export default class Workspace {
 
@@ -149,26 +150,7 @@ export default class Workspace {
     }
 
     initializeStore() {
-        const channelName = this.channelName;
-
-        const useStore = Statamic.$pinia.defineStore(`collaboration/${channelName}`, {
-            state: () => ({
-                users: [],
-            }),
-            actions: {
-                setUsers(users) {
-                    this.users = users;
-                },
-                addUser(user) {
-                    this.users.push(user);
-                },
-                removeUser(removedUser) {
-                    this.users = this.users.filter(user => user.id !== removedUser.id);
-                },
-            },
-        });
-
-        this.store = useStore();
+        this.store = useCollaborationStore(this.channelName);
     }
 
     initializeStatusBar() {

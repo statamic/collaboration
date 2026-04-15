@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue';
 import { Icon, Dropdown, DropdownMenu, DropdownItem, Avatar } from '@statamic/cms/ui';
+import { useCollaborationStore } from './store';
 
 defineEmits(['unlock']);
 
@@ -11,14 +12,7 @@ const props = defineProps({
     },
 });
 
-const useStore = Statamic.$pinia.defineStore(`collaboration/${props.channelName}`, {
-    state: () => ({
-        users: [],
-    }),
-});
-
-const store = useStore();
-
+const store = useCollaborationStore(props.channelName);
 const users = computed(() => store.users);
 const connecting = computed(() => store.users.length === 0);
 </script>
