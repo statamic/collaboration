@@ -67,7 +67,7 @@ export default class Workspace {
             Statamic.$toast.success(`${user.name} has joined.`);
             this.whisper(`initialize-state-for-${user.id}`, {
                 values: this.container.values.value,
-                meta: this.container.meta.value,
+                meta: this.cleanEntireMetaPayload(this.container.meta.value),
                 focus: this.container.fieldFocus.value,
             });
 
