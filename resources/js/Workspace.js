@@ -24,7 +24,6 @@ export default class Workspace {
         this.initialStateUpdated = false;
 
         this.debouncedBroadcastValueChangeFuncsByHandle = {};
-        this.unlockHandler = null;
         this.focusWatcher = null;
     }
 
@@ -48,10 +47,6 @@ export default class Workspace {
         if (this.focusWatcher) {
             this.focusWatcher();
             this.focusWatcher = null;
-        }
-        if (this.unlockHandler) {
-            Statamic.$events.$off(`collaboration.${this.channelName}.unlock`, this.unlockHandler);
-            this.unlockHandler = null;
         }
         this.echo.leave(this.channelName);
     }
@@ -174,16 +169,15 @@ export default class Workspace {
     }
 
     initializeStatusBar() {
-        this.container.pushComponent('CollaborationStatusBar', {
+        const component = this.container.pushComponent('CollaborationStatusBar', {
             props: {
                 channelName: this.channelName,
             }
         });
 
-        this.unlockHandler = (targetUser) => {
+        component.on('unlock', (targetUser) => {
             this.whisper('force-unlock', { targetUser, originUser: this.user });
-        };
-        Statamic.$events.$on(`collaboration.${this.channelName}.unlock`, this.unlockHandler);
+        });
     }
 
     initializeFocusBlur() {
