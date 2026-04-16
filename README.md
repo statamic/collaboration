@@ -4,9 +4,6 @@
 > Real-time collaboration and multi-user authoring for Statamic Pro.
 <!-- /statamic:hide -->
 
-> [!NOTE]  
-> This addon hasn't been updated for Statamic 6 yet. We're planning to tackle it soon, but don't have a firm ETA.
-
 ## Features
 
 - Presence indicators when multiple people have the same entry opened.
