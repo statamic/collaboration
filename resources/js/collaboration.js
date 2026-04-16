@@ -16,10 +16,13 @@ Statamic.$echo.booted(Echo => {
 Statamic.$events.$on('publish-container-created', container => {
     if (!container.reference) return;
     manager.addWorkspace(container);
-    window.addEventListener('unload', () => manager.destroyWorkspace(container));
 });
 
 Statamic.$events.$on('publish-container-destroyed', container => {
     if (!manager.workspaces[container.name]) return;
     manager.destroyWorkspace(container);
+});
+
+window.addEventListener('unload', () => {
+    Object.keys(manager.workspaces).forEach(name => manager.destroyWorkspace({ name }));
 });
