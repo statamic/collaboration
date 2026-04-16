@@ -98,6 +98,7 @@ export default class Workspace {
             if (this.initialStateUpdated) return;
             this.debug('✅ Applying broadcasted state change', payload);
             this.container.setValues(payload.values);
+            this.lastValues = clone(payload.values);
             const restoredMeta = this.restoreEntireMetaPayload(payload.meta || {});
             this.container.setMeta(restoredMeta);
             this.lastMetaValues = clone(restoredMeta);
