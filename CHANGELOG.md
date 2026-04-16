@@ -1,5 +1,18 @@
 # Release Notes
 
+## 2.0.0 (2026-04-16)
+
+### What's new
+- Statamic 6 support. [#110](https://github.com/statamic/collaboration/pull/110) by @jasonvarga
+
+### What's fixed
+- Fix end-of-file crackle on sound effects. [#111](https://github.com/statamic/collaboration/pull/111) by @jasonvarga
+
+### Major changes
+- Statamic 5 is no longer supported.
+
+
+
 ## 1.0.1 (2025-06-30)
 
 ### What's fixed
