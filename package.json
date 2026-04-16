@@ -1,4 +1,5 @@
 {
+    "name": "collaboration",
     "type": "module",
     "private": true,
     "scripts": {
@@ -10,7 +11,7 @@
     },
     "devDependencies": {
         "@statamic/cms": "file:./vendor/statamic/cms/resources/dist-package",
-        "laravel-vite-plugin": "^2.0.0",
-        "vite": "^7.0.4"
+        "laravel-vite-plugin": "^3.0.0",
+        "vite": "^8.0.0"
     }
 }
