@@ -1,7 +1,7 @@
 import { watch } from 'vue';
 import { debounce } from '@statamic/cms';
-import buddyIn from '../audio/buddy-in.mp3'
-import buddyOut from '../audio/buddy-out.mp3'
+import buddyIn from '../audio/buddy-in.wav'
+import buddyOut from '../audio/buddy-out.wav'
 import { useCollaborationStore } from './store';
 
 export default class Workspace {
