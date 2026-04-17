@@ -16,6 +16,7 @@ const emit = defineEmits(['send']);
 const store = useCollaborationStore(props.channelName);
 const messages = computed(() => store.messages);
 const unread = computed(() => store.unreadCount);
+const isAlone = computed(() => store.users.length <= 1);
 const presentUsersById = computed(() => {
     const map = {};
     store.users.forEach(u => { map[String(u.id)] = u; });
@@ -91,7 +92,7 @@ function jumpToLatest() {
 
 function send() {
     const body = draft.value.trim();
-    if (!body) return;
+    if (!body || isAlone.value) return;
     emit('send', body);
     draft.value = '';
     nextTick(() => {
@@ -274,23 +275,29 @@ function showTime(index) {
         </div>
         </StackContent>
         <StackFooter class="px-2! py-1!">
-            <div class="flex w-full items-center gap-2">
-                <Textarea
-                    v-model="draft"
-                    :rows="1"
-                    resize="vertical"
-                    :elastic="true"
-                    :placeholder="__('Write a message...')"
-                    class="flex-1 py-2!"
-                    @keydown="onKeydown"
-                />
-                <Button
-                    icon="arrow-right"
-                    icon-only
-                    variant="primary"
-                    :disabled="!draft.trim()"
-                    @click="send"
-                />
+            <div class="flex w-full flex-col gap-1">
+                <p v-if="isAlone" class="px-1 pt-2 text-2xs text-gray-500 dark:text-gray-400">
+                    {{ __("Chat is disabled. You're the only one here.") }}
+                </p>
+                <div class="flex w-full items-center gap-2">
+                    <Textarea
+                        v-model="draft"
+                        :rows="1"
+                        resize="vertical"
+                        :elastic="true"
+                        :placeholder="isAlone ? __('Waiting for someone to join...') : __('Write a message...')"
+                        :disabled="isAlone"
+                        class="flex-1 py-2!"
+                        @keydown="onKeydown"
+                    />
+                    <Button
+                        icon="arrow-right"
+                        icon-only
+                        variant="primary"
+                        :disabled="!draft.trim() || isAlone"
+                        @click="send"
+                    />
+                </div>
             </div>
         </StackFooter>
     </Stack>
