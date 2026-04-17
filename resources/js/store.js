@@ -132,7 +132,13 @@ export function useCollaborationStore(channelName) {
             },
             addMessage(message) {
                 if (this.messages.some(m => m.id === message.id)) return;
-                this.messages.push(message);
+
+                // Insert by ts so peer clock skew can't reorder messages.
+                // Scan from the end — messages almost always arrive in order.
+                let idx = this.messages.length;
+                while (idx > 0 && this.messages[idx - 1].ts > message.ts) idx--;
+                this.messages.splice(idx, 0, message);
+
                 const limit = historyLimit();
                 if (this.messages.length > limit) {
                     this.messages.splice(0, this.messages.length - limit);

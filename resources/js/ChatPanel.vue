@@ -162,7 +162,7 @@ function startsGroup(index) {
     const prev = messages.value[index - 1];
     if (!prev || !curr) return true;
     if (String(prev.user?.id) !== String(curr.user?.id)) return true;
-    return (curr.ts - prev.ts) > GROUP_WINDOW_MS;
+    return Math.max(0, curr.ts - prev.ts) > GROUP_WINDOW_MS;
 }
 
 function showTime(index) {
@@ -171,7 +171,7 @@ function showTime(index) {
     const prev = messages.value[index - 1];
     if (!prev || !curr) return true;
     if (String(prev.user?.id) !== String(curr.user?.id)) return true;
-    return (curr.ts - prev.ts) > TIME_WINDOW_MS;
+    return Math.max(0, curr.ts - prev.ts) > TIME_WINDOW_MS;
 }
 </script>
 
