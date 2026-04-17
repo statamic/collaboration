@@ -17,7 +17,9 @@ const store = useCollaborationStore(props.channelName);
 const users = computed(() => store.users);
 const connecting = computed(() => store.users.length === 0);
 const chatEnabled = computed(() => Statamic.$config.get('collaboration.chat.enabled') !== false);
-const visible = computed(() => connecting.value || users.value.length > 1 || chatEnabled.value);
+const hasChatHistory = computed(() => store.messages.length > 0);
+const showChat = computed(() => chatEnabled.value && !connecting.value && (users.value.length > 1 || hasChatHistory.value));
+const visible = computed(() => connecting.value || users.value.length > 1 || showChat.value);
 </script>
 
 <template>
@@ -42,7 +44,7 @@ const visible = computed(() => connecting.value || users.value.length > 1 || cha
             </Dropdown>
         </div>
         <ChatPanel
-            v-if="chatEnabled && !connecting"
+            v-if="showChat"
             :channel-name="channelName"
             @send="body => $emit('chat', body)"
         />
