@@ -2,6 +2,8 @@ import { watch } from 'vue';
 import { debounce } from '@statamic/cms';
 import buddyIn from '../audio/buddy-in.wav'
 import buddyOut from '../audio/buddy-out.wav'
+import messageSend from '../audio/message-send.wav'
+import messageReceive from '../audio/message-receive.wav'
 import { useCollaborationStore } from './store';
 
 export default class Workspace {
@@ -161,6 +163,10 @@ export default class Workspace {
                     initials: sender.initials,
                 },
             });
+
+            if (Statamic.$config.get('collaboration.sound_effects')) {
+                this.playAudio('message-receive');
+            }
         });
 
         this.listenForWhisper('revision-restored', ({ user }) => {
@@ -217,6 +223,10 @@ export default class Workspace {
         // Wire payload carries only the sender's id — recipients resolve the
         // rest from the presence channel to block casual impersonation.
         this.whisper('chat-message', { id, body: text, ts, userId: this.user.id });
+
+        if (Statamic.$config.get('collaboration.sound_effects')) {
+            this.playAudio('message-send');
+        }
     }
 
     initializeFocusBlur() {
@@ -484,6 +494,10 @@ export default class Workspace {
             return buddyIn;
         } else if (file === 'buddy-out') {
             return buddyOut;
+        } else if (file === 'message-send') {
+            return messageSend;
+        } else if (file === 'message-receive') {
+            return messageReceive;
         }
 
         console.error('audio not found');
