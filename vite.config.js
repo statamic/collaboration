@@ -9,7 +9,7 @@ export default defineConfig({
         statamic(),
         tailwindcss(),
         laravel({
-            input: ["resources/js/collaboration.js", "resources/css/cp.css"],
+            input: ["resources/js/collaboration.js"],
             refresh: true,
             publicDirectory: "resources/dist",
             hotFile: "resources/dist/hot",
