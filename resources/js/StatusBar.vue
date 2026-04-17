@@ -2,8 +2,9 @@
 import { computed } from 'vue';
 import { Icon, Dropdown, DropdownMenu, DropdownItem, Avatar } from '@statamic/cms/ui';
 import { useCollaborationStore } from './store';
+import ChatPanel from './ChatPanel.vue';
 
-defineEmits(['unlock']);
+defineEmits(['unlock', 'chat']);
 
 const props = defineProps({
     channelName: {
@@ -15,10 +16,12 @@ const props = defineProps({
 const store = useCollaborationStore(props.channelName);
 const users = computed(() => store.users);
 const connecting = computed(() => store.users.length === 0);
+const chatEnabled = computed(() => Statamic.$config.get('collaboration.chat.enabled') !== false);
+const visible = computed(() => connecting.value || users.value.length > 1 || chatEnabled.value);
 </script>
 
 <template>
-    <div class="collaboration-status-bar relative -top-[1.25rem]" v-if="connecting || users.length > 1">
+    <div class="collaboration-status-bar relative -top-[1.25rem] flex items-center gap-3" v-if="visible">
         <div v-if="connecting" class="flex items-center text-sm text-gray-500 dark:text-gray-400">
             <Icon name="loading" class="me-1.5 size-3.5 animate-spin" />
             {{ __('Attempting websocket connection...') }}
@@ -38,5 +41,10 @@ const connecting = computed(() => store.users.length === 0);
                 </DropdownMenu>
             </Dropdown>
         </div>
+        <ChatPanel
+            v-if="chatEnabled && !connecting"
+            :channel-name="channelName"
+            @send="body => $emit('chat', body)"
+        />
     </div>
 </template>

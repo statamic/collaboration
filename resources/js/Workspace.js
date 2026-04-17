@@ -141,6 +141,11 @@ export default class Workspace {
             this.destroy(); // Stop listening to anything else.
         });
 
+        this.listenForWhisper('chat-message', (message) => {
+            this.debug('💬 Received chat message', message);
+            this.store.addMessage(message);
+        });
+
         this.listenForWhisper('revision-restored', ({ user }) => {
             Statamic.$toast.success(`Revision restored by ${user.name}.`);
             Statamic.$components.append('CollaborationBlockingNotification', {
@@ -164,6 +169,31 @@ export default class Workspace {
         component.on('unlock', (targetUser) => {
             this.whisper('force-unlock', { targetUser, originUser: this.user });
         });
+
+        component.on('chat', (body) => {
+            this.sendChatMessage(body);
+        });
+    }
+
+    sendChatMessage(body) {
+        const text = String(body || '').trim();
+        if (!text) return;
+
+        const message = {
+            id: (crypto && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+            body: text,
+            ts: Date.now(),
+            user: {
+                id: this.user.id,
+                name: this.user.name,
+                avatar: this.user.avatar,
+                initials: this.user.initials,
+            },
+        };
+
+        this.store.addMessage(message);
+        this.store.markRead();
+        this.whisper('chat-message', message);
     }
 
     initializeFocusBlur() {
