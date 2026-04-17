@@ -1,11 +1,11 @@
 {
     "name": "statamic/collaboration",
     "type": "statamic-addon",
-    "description": "Collaboration tools for Statamic 3",
+    "description": "Real-time collaboration and multi-user authoring for Statamic Pro.",
     "license": "proprietary",
     "require": {
-        "statamic/cms": "^4.0",
-        "pixelfear/composer-dist-plugin": "^0.1.4"
+        "statamic/cms": "^6.0",
+        "pixelfear/composer-dist-plugin": "^0.1.6"
     },
     "extra": {
         "laravel": {
@@ -15,7 +15,7 @@
         },
         "statamic": {
             "name": "Collaboration",
-            "description": "Collaboration tools"
+            "description": "Real-time collaboration and multi-user authoring for Statamic Pro."
         },
         "download-dist": {
             "url": "https://github.com/statamic/collaboration/releases/download/{$version}/dist.tar.gz",
@@ -25,6 +25,11 @@
     "autoload": {
         "psr-4": {
             "Statamic\\Collaboration\\": "src"
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "pixelfear/composer-dist-plugin": true
         }
     }
 }

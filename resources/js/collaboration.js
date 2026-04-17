@@ -4,12 +4,8 @@ import BlockingNotification from './BlockingNotification.vue';
 const manager = new Manager;
 
 Statamic.booting(() => {
-    Statamic.component('CollaborationStatusBar', StatusBar);
-    Statamic.component('CollaborationBlockingNotification', BlockingNotification);
-
-    Statamic.$store.registerModule('collaboration', {
-        namespaced: true
-    });
+    Statamic.$components.register('CollaborationStatusBar', StatusBar);
+    Statamic.$components.register('CollaborationBlockingNotification', BlockingNotification);
 });
 
 Statamic.$echo.booted(Echo => {
@@ -20,10 +16,13 @@ Statamic.$echo.booted(Echo => {
 Statamic.$events.$on('publish-container-created', container => {
     if (!container.reference) return;
     manager.addWorkspace(container);
-    window.addEventListener('unload', () => manager.destroyWorkspace(container));
 });
 
 Statamic.$events.$on('publish-container-destroyed', container => {
     if (!manager.workspaces[container.name]) return;
     manager.destroyWorkspace(container);
+});
+
+window.addEventListener('unload', () => {
+    Object.keys(manager.workspaces).forEach(name => manager.destroyWorkspace({ name }));
 });

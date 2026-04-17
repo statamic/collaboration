@@ -30,7 +30,7 @@ class ServiceProvider extends AddonServiceProvider
                 'avatar' => $user->avatar(),
                 'initials' => $user->initials(),
             ];
-        });
+        }, ['guards' => [config('statamic.users.guards.cp')]]);
 
         Broadcast::channel('globals.{set}.{locale}.{site}', function ($user, $set, $locale, $site) {
             $user = User::fromUser($user);
@@ -43,7 +43,7 @@ class ServiceProvider extends AddonServiceProvider
                 'avatar' => $user->avatar(),
                 'initials' => $user->initials(),
             ];
-        });
+        }, ['guards' => [config('statamic.users.guards.cp')]]);
 
         Broadcast::channel('term.{taxonomy}.{id}.{locale}.{site}', function ($user, $taxonomy, $id, $locale, $site) {
             $user = User::fromUser($user);
@@ -56,6 +56,6 @@ class ServiceProvider extends AddonServiceProvider
                 'avatar' => $user->avatar(),
                 'initials' => $user->initials(),
             ];
-        });
+        }, ['guards' => [config('statamic.users.guards.cp')]]);
     }
 }

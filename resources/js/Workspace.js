@@ -1,5 +1,8 @@
-import buddyIn from '../audio/buddy-in.mp3'
-import buddyOut from '../audio/buddy-out.mp3'
+import { watch } from 'vue';
+import { debounce } from '@statamic/cms';
+import buddyIn from '../audio/buddy-in.wav'
+import buddyOut from '../audio/buddy-out.wav'
+import { useCollaborationStore } from './store';
 
 export default class Workspace {
 
@@ -7,7 +10,9 @@ export default class Workspace {
         this.container = container;
         this.echo = null;
         this.started = false;
-        this.storeSubscriber = null;
+        this.valuesWatcher = null;
+        this.metaWatcher = null;
+        this.store = null;
         this.lastValues = {};
         this.lastMetaValues = {};
         this.user = Statamic.user;
@@ -15,6 +20,7 @@ export default class Workspace {
 
         this.debouncedBroadcastValueChangeFuncsByHandle = {};
         this.debouncedBroadcastMetaChangeFuncsByHandle = {};
+        this.focusWatcher = null;
     }
 
     start() {
@@ -22,15 +28,26 @@ export default class Workspace {
 
         this.initializeEcho();
         this.initializeStore();
-        this.initializeFocus();
         this.initializeValuesAndMeta();
         this.initializeHooks();
         this.initializeStatusBar();
+        this.initializeFocusBlur();
         this.started = true;
     }
 
     destroy() {
-        this.storeSubscriber.apply();
+        if (this.valuesWatcher) {
+            this.valuesWatcher();
+            this.valuesWatcher = null;
+        }
+        if (this.metaWatcher) {
+            this.metaWatcher();
+            this.metaWatcher = null;
+        }
+        if (this.focusWatcher) {
+            this.focusWatcher();
+            this.focusWatcher = null;
+        }
         this.echo.leave(this.channelName);
     }
 
@@ -40,17 +57,18 @@ export default class Workspace {
         this.channel = this.echo.join(this.channelName);
 
         this.channel.here(users => {
-            this.subscribeToVuexMutations();
-            Statamic.$store.commit(`collaboration/${this.channelName}/setUsers`, users);
+            this.initializeValueWatcher();
+            this.initializeMetaWatcher();
+            this.store.setUsers(users);
         });
 
         this.channel.joining(user => {
-            Statamic.$store.commit(`collaboration/${this.channelName}/addUser`, user);
+            this.store.addUser(user);
             Statamic.$toast.success(`${user.name} has joined.`);
             this.whisper(`initialize-state-for-${user.id}`, {
-                values: Statamic.$store.state.publish[this.container.name].values,
-                meta: this.cleanEntireMetaPayload(Statamic.$store.state.publish[this.container.name].meta),
-                focus: Statamic.$store.state.collaboration[this.channelName].focus,
+                values: this.container.values.value,
+                meta: this.cleanEntireMetaPayload(this.container.meta.value),
+                focus: this.container.fieldFocus.value,
             });
 
             if (Statamic.$config.get('collaboration.sound_effects')) {
@@ -59,9 +77,9 @@ export default class Workspace {
         });
 
         this.channel.leaving(user => {
-            Statamic.$store.commit(`collaboration/${this.channelName}/removeUser`, user);
+            this.store.removeUser(user);
             Statamic.$toast.success(`${user.name} has left.`);
-            this.blurAndUnlock(user);
+            this.blur(user);
 
             if (Statamic.$config.get('collaboration.sound_effects')) {
                 this.playAudio('buddy-out');
@@ -79,20 +97,23 @@ export default class Workspace {
         this.listenForWhisper(`initialize-state-for-${this.user.id}`, payload => {
             if (this.initialStateUpdated) return;
             this.debug('✅ Applying broadcasted state change', payload);
-            Statamic.$store.dispatch(`publish/${this.container.name}/setValues`, payload.values);
-            Statamic.$store.dispatch(`publish/${this.container.name}/setMeta`, this.restoreEntireMetaPayload(payload.meta));
-            _.each(payload.focus, ({ user, handle }) => this.focusAndLock(user, handle));
+            this.container.setValues(payload.values);
+            this.lastValues = clone(payload.values);
+            const restoredMeta = this.restoreEntireMetaPayload(payload.meta || {});
+            this.container.setMeta(restoredMeta);
+            this.lastMetaValues = clone(restoredMeta);
+            Object.entries(payload.focus).forEach(([, { user, handle }]) => this.focus(user, handle));
             this.initialStateUpdated = true;
         });
 
         this.listenForWhisper('focus', ({ user, handle }) => {
             this.debug(`Heard that user has changed focus`, { user, handle });
-            this.focusAndLock(user, handle);
+            this.focus(user, handle);
         });
 
         this.listenForWhisper('blur', ({ user, handle }) => {
             this.debug(`Heard that user has blurred`, { user, handle });
-            this.blurAndUnlock(user, handle);
+            this.blur(user, handle);
         });
 
         this.listenForWhisper('force-unlock', ({ targetUser, originUser }) => {
@@ -101,8 +122,7 @@ export default class Workspace {
             if (targetUser.id !== this.user.id) return;
 
             document.activeElement.blur();
-            this.blurAndUnlock(this.user);
-            this.whisper('blur', { user: this.user });
+            this.blur(this.user);
             Statamic.$toast.info(`${originUser.name} has unlocked your editor.`, { duration: false });
         });
 
@@ -131,43 +151,33 @@ export default class Workspace {
     }
 
     initializeStore() {
-        Statamic.$store.registerModule(['collaboration', this.channelName], {
-            namespaced: true,
-            state: {
-                users: [],
-                focus: {},
-            },
-            mutations: {
-                setUsers(state, users) {
-                    state.users = users;
-                },
-                addUser(state, user) {
-                    state.users.push(user);
-                },
-                removeUser(state, removedUser) {
-                    state.users = state.users.filter(user => user.id !== removedUser.id);
-                },
-                focus(state, { handle, user }) {
-                    Vue.set(state.focus, user.id, { handle, user });
-                },
-                blur(state, user) {
-                    Vue.delete(state.focus, user.id);
-                }
-            }
-        });
+        this.store = useCollaborationStore(this.channelName);
     }
 
     initializeStatusBar() {
         const component = this.container.pushComponent('CollaborationStatusBar', {
             props: {
                 channelName: this.channelName,
-                connecting: this.connecting,
             }
         });
 
         component.on('unlock', (targetUser) => {
             this.whisper('force-unlock', { targetUser, originUser: this.user });
         });
+    }
+
+    initializeFocusBlur() {
+        this.focusWatcher = watch(
+            () => this.container.fieldFocus.value[this.user.id]?.handle,
+            (newHandle, oldHandle) => {
+                if (oldHandle) {
+                    this.whisper('blur', { user: this.user, handle: oldHandle });
+                }
+                if (newHandle) {
+                    this.whisper('focus', { user: this.user, handle: newHandle });
+                }
+            }
+        );
     }
 
     initializeHooks() {
@@ -196,80 +206,58 @@ export default class Workspace {
         });
     }
 
-    initializeFocus() {
-        this.container.$on('focus', handle => {
-            const user = this.user;
-            this.focus(user, handle);
-            this.whisper('focus', { user, handle });
-        });
-        this.container.$on('blur', handle => {
-            const user = this.user;
-            this.blur(user, handle);
-            this.whisper('blur', { user, handle });
-        });
-    }
-
     focus(user, handle) {
-        Statamic.$store.commit(`collaboration/${this.channelName}/focus`, { user, handle });
+        this.container.focusField(handle, user);
     }
 
-    focusAndLock(user, handle) {
-        this.focus(user, handle);
-        Statamic.$store.commit(`publish/${this.container.name}/lockField`, { user, handle });
-    }
-
-    blur(user) {
-        Statamic.$store.commit(`collaboration/${this.channelName}/blur`, user);
-    }
-
-    blurAndUnlock(user, handle = null) {
-        handle = handle || data_get(Statamic.$store.state.collaboration[this.channelName], `focus.${user.id}.handle`);
+    blur(user, handle = null) {
+        handle = handle || this.container.fieldFocus.value[user.id]?.handle;
         if (!handle) return;
-        this.blur(user);
-        Statamic.$store.commit(`publish/${this.container.name}/unlockField`, handle);
+        this.container.blurField(handle, user);
     }
 
-    subscribeToVuexMutations() {
-        this.storeSubscriber = Statamic.$store.subscribe((mutation, state) => {
-            switch (mutation.type) {
-                case `publish/${this.container.name}/setFieldValue`:
-                    this.vuexFieldValueHasBeenSet(mutation.payload);
-                    break;
-                case `publish/${this.container.name}/setFieldMeta`:
-                    this.vuexFieldMetaHasBeenSet(mutation.payload);
-                    break;
-            }
-        });
+    initializeValueWatcher() {
+        if (this.valuesWatcher) return;
+
+        this.valuesWatcher = watch(
+            this.container.values,
+            (newValues) => {
+                Object.keys(newValues).forEach(handle => {
+                    const newValue = newValues[handle];
+                    if (this.valueHasChanged(handle, newValue)) {
+                        this.rememberValueChange(handle, newValue);
+                        this.debouncedBroadcastValueChangeFuncByHandle(handle)({
+                            handle,
+                            value: newValue,
+                            user: this.user.id,
+                        });
+                    }
+                });
+            },
+            { deep: true }
+        );
     }
 
-    // A field's value has been set in the vuex store.
-    // It could have been triggered by the current user editing something,
-    // or by the workspace applying a change dispatched by another user editing something.
-    vuexFieldValueHasBeenSet(payload) {
-        this.debug('Vuex field value has been set', payload);
-        if (!this.valueHasChanged(payload.handle, payload.value)) {
-            // No change? Don't bother doing anything.
-            this.debug(`Value for ${payload.handle} has not changed.`, { value: payload.value, lastValue: this.lastValues[payload.handle] });
-            return;
-        }
+    initializeMetaWatcher() {
+        if (this.metaWatcher || !this.container.meta) return;
 
-        this.rememberValueChange(payload.handle, payload.value);
-        this.debouncedBroadcastValueChangeFuncByHandle(payload.handle)(payload);
-    }
-
-    // A field's meta value has been set in the vuex store.
-    // It could have been triggered by the current user editing something,
-    // or by the workspace applying a change dispatched by another user editing something.
-    vuexFieldMetaHasBeenSet(payload) {
-        this.debug('Vuex field meta has been set', payload);
-        if (!this.metaHasChanged(payload.handle, payload.value)) {
-            // No change? Don't bother doing anything.
-            this.debug(`Meta for ${payload.handle} has not changed.`, { value: payload.value, lastValue: this.lastMetaValues[payload.handle] });
-            return;
-        }
-
-        this.rememberMetaChange(payload.handle, payload.value);
-        this.debouncedBroadcastMetaChangeFuncByHandle(payload.handle)(payload);
+        this.metaWatcher = watch(
+            this.container.meta,
+            (newMeta) => {
+                Object.keys(newMeta).forEach(handle => {
+                    const newValue = newMeta[handle];
+                    if (this.metaHasChanged(handle, newValue)) {
+                        this.rememberMetaChange(handle, newValue);
+                        this.debouncedBroadcastMetaChangeFuncByHandle(handle)({
+                            handle,
+                            value: newValue,
+                            user: this.user.id,
+                        });
+                    }
+                });
+            },
+            { deep: true }
+        );
     }
 
     rememberValueChange(handle, value) {
@@ -288,7 +276,7 @@ export default class Workspace {
         if (func) return func;
 
         // if the handle has no debounced broadcast function yet, create one and return it
-        this.debouncedBroadcastValueChangeFuncsByHandle[handle] = _.debounce((payload) => {
+        this.debouncedBroadcastValueChangeFuncsByHandle[handle] = debounce((payload) => {
             this.broadcastValueChange(payload);
         }, 500);
         return this.debouncedBroadcastValueChangeFuncsByHandle[handle];
@@ -300,7 +288,7 @@ export default class Workspace {
         if (func) return func;
 
         // if the handle has no debounced broadcast function yet, create one and return it
-        this.debouncedBroadcastMetaChangeFuncsByHandle[handle] = _.debounce((payload) => {
+        this.debouncedBroadcastMetaChangeFuncsByHandle[handle] = debounce((payload) => {
             this.broadcastMetaChange(payload);
         }, 500);
         return this.debouncedBroadcastMetaChangeFuncsByHandle[handle];
@@ -349,31 +337,30 @@ export default class Workspace {
     // entire list of fields' meta values. Used when a user joins
     // and needs to receive everything in one fell swoop.
     cleanEntireMetaPayload(values) {
-        return _.mapObject(values, meta => {
-            const allowed = data_get(meta, '__collaboration');
-            if (!allowed) return meta;
-            let allowedValues = {};
-            allowed.forEach(key => allowedValues[key] = meta[key]);
-            return allowedValues;
-        });
+        return Object.entries(values).reduce((cleaned, [handle, value]) => {
+            cleaned[handle] = this.cleanMetaPayload({ handle, value }).value;
+            return cleaned;
+        }, {});
     }
 
     restoreEntireMetaPayload(payload) {
-        return _.mapObject(payload, (value, key) => {
-            return {...this.lastMetaValues[key], ...value};
-        });
+        return Object.entries(payload).reduce((restored, [handle, value]) => {
+            restored[handle] = { ...(this.lastMetaValues[handle] || {}), ...value };
+            return restored;
+        }, {});
     }
 
     applyBroadcastedValueChange(payload) {
         this.debug('✅ Applying broadcasted value change', payload);
-        Statamic.$store.dispatch(`publish/${this.container.name}/setFieldValue`, payload);
+        this.rememberValueChange(payload.handle, payload.value);
+        this.container.setFieldValue(payload.handle, payload.value);
     }
 
     applyBroadcastedMetaChange(payload) {
         this.debug('✅ Applying broadcasted meta change', payload);
-        let value = {...this.lastMetaValues[payload.handle], ...payload.value};
-        payload.value = value;
-        Statamic.$store.dispatch(`publish/${this.container.name}/setFieldMeta`, payload);
+        let value = { ...this.lastMetaValues[payload.handle], ...payload.value };
+        this.rememberMetaChange(payload.handle, value);
+        this.container.setFieldMeta(payload.handle, value);
     }
 
     debug(message, args) {
@@ -381,7 +368,7 @@ export default class Workspace {
     }
 
     isAlone() {
-        return Statamic.$store.state.collaboration[this.channelName].users.length === 1;
+        return this.store.users.length === 1;
     }
 
     whisper(event, payload) {
@@ -450,7 +437,7 @@ export default class Workspace {
     }
 
     initializeValuesAndMeta() {
-        this.lastValues = clone(Statamic.$store.state.publish[this.container.name].values);
-        this.lastMetaValues = clone(Statamic.$store.state.publish[this.container.name].meta);
+        this.lastValues = clone(this.container.values.value);
+        this.lastMetaValues = clone(this.container.meta?.value || {});
     }
 }
