@@ -17,15 +17,11 @@ const store = useCollaborationStore(props.channelName);
 const messages = computed(() => store.messages);
 const unread = computed(() => store.unreadCount);
 const isAlone = computed(() => store.users.length <= 1);
-const presentUsersById = computed(() => {
-    const map = {};
-    store.users.forEach(u => { map[String(u.id)] = u; });
-    if (Statamic.user) map[String(Statamic.user.id)] = { ...map[String(Statamic.user.id)], ...Statamic.user };
-    return map;
-});
 
+// Render strictly from the user snapshot stored with the message so every
+// client sees the same name/avatar regardless of presence state.
 function userFor(msg) {
-    return presentUsersById.value[String(msg.user?.id)] || msg.user || {};
+    return msg.user || {};
 }
 
 const open = ref(false);

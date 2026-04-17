@@ -143,7 +143,24 @@ export default class Workspace {
 
         this.listenForWhisper('chat-message', (message) => {
             this.debug('💬 Received chat message', message);
-            this.store.addMessage(message);
+            // Don't trust the sender's user blob — resolve from presence. Drops any
+            // whisper forging an id that isn't currently on the channel.
+            const sender = this.store.users.find(u => String(u.id) === String(message.userId));
+            if (!sender) {
+                this.debug('⚠️ Dropping chat message from unknown sender', message);
+                return;
+            }
+            this.store.addMessage({
+                id: message.id,
+                body: message.body,
+                ts: message.ts,
+                user: {
+                    id: sender.id,
+                    name: sender.name,
+                    avatar: sender.avatar,
+                    initials: sender.initials,
+                },
+            });
         });
 
         this.listenForWhisper('revision-restored', ({ user }) => {
@@ -179,21 +196,27 @@ export default class Workspace {
         const text = String(body || '').trim();
         if (!text) return;
 
-        const message = {
-            id: (crypto && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+        const id = (crypto && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+        const ts = Date.now();
+
+        // Locally persist with a full user snapshot so history still renders
+        // after we (or our peers) leave the channel.
+        this.store.addMessage({
+            id,
             body: text,
-            ts: Date.now(),
+            ts,
             user: {
                 id: this.user.id,
                 name: this.user.name,
                 avatar: this.user.avatar,
                 initials: this.user.initials,
             },
-        };
-
-        this.store.addMessage(message);
+        });
         this.store.markRead();
-        this.whisper('chat-message', message);
+
+        // Wire payload carries only the sender's id — recipients resolve the
+        // rest from the presence channel to block casual impersonation.
+        this.whisper('chat-message', { id, body: text, ts, userId: this.user.id });
     }
 
     initializeFocusBlur() {
