@@ -27,9 +27,23 @@ function userFor(msg) {
 const open = ref(false);
 const draft = ref('');
 const scroller = ref(null);
+const textarea = ref(null);
 const lastSeenLength = ref(messages.value.length);
 const newMessagesBelow = ref(0);
 const me = Statamic.user;
+
+function focusTextarea() {
+    const t = textarea.value;
+    if (!t) return;
+    // Prefer the component's exposed focus() if it provides one.
+    if (typeof t.focus === 'function') {
+        t.focus();
+        return;
+    }
+    const root = t.$el ?? t;
+    const el = root.tagName === 'TEXTAREA' ? root : root.querySelector?.('textarea');
+    el?.focus();
+}
 
 watch(open, (isOpen) => {
     if (isOpen) {
@@ -38,6 +52,9 @@ watch(open, (isOpen) => {
             scrollToBottom();
             lastSeenLength.value = messages.value.length;
             newMessagesBelow.value = 0;
+            if (isAlone.value) return;
+            // Delay past Stack's own focus-trap init so we win the race.
+            setTimeout(focusTextarea, 50);
         });
     }
 });
@@ -277,14 +294,15 @@ function showTime(index) {
                 </p>
                 <div class="flex w-full items-center gap-2">
                     <Textarea
-                        v-model="draft"
-                        :rows="1"
-                        resize="vertical"
+                        :disabled="isAlone"
                         :elastic="true"
                         :placeholder="isAlone ? __('Waiting for someone to join...') : __('Write a message...')"
-                        :disabled="isAlone"
-                        class="flex-1 py-2!"
+                        :rows="1"
                         @keydown="onKeydown"
+                        class="flex-1 py-2!"
+                        ref="textarea"
+                        resize="vertical"
+                        v-model="draft"
                     />
                     <Button
                         icon="arrow-right"
