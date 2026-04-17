@@ -18,28 +18,25 @@ const connecting = computed(() => store.users.length === 0);
 </script>
 
 <template>
-    <div class="collaboration-status-bar" :class="{ '-mt-2 mb-2': connecting || users.length > 1 }">
-        <div v-if="connecting" class="flex items-center text-sm text-gray-600">
-            <Icon name="loading" class="mr-1" />
+    <div class="collaboration-status-bar relative -top-[1.25rem]" v-if="connecting || users.length > 1">
+        <div v-if="connecting" class="flex items-center text-sm text-gray-500 dark:text-gray-400">
+            <Icon name="loading" class="me-1.5 size-3.5 animate-spin" />
             {{ __('Attempting websocket connection...') }}
         </div>
-        <div v-if="users.length > 1" class="flex items-center">
-            <div
-                v-for="user in users"
-                :key="user.id"
-            >
-                <Dropdown>
-                    <template #trigger>
-                        <Avatar
-                            :user="user"
-                            class="rounded-full w-6 h-6 mr-1 cursor-pointer text-xs"
-                        />
-                    </template>
-                    <DropdownMenu>
-                        <DropdownItem :text="__('Unlock')" @click="$emit('unlock', user)" />
-                    </DropdownMenu>
-                </Dropdown>
-            </div>
+        <div v-if="users.length > 1" class="flex items-center -space-x-2">
+            <Dropdown v-for="(user, index) in users" :key="user.id">
+                <template #trigger>
+                    <Avatar
+                        :user="user"
+                        :style="{ zIndex: users.length - index }"
+                        v-tooltip="user.name"
+                        class="relative size-7 cursor-pointer text-2xs ring-2 ring-content-bg dark:ring-dark-content-bg transition hover:z-20! hover:scale-110 data-[state=open]:z-20! data-[state=open]:scale-110"
+                    />
+                </template>
+                <DropdownMenu>
+                    <DropdownItem :text="__('Release field lock')" icon="security-unlock" @click="$emit('unlock', user)" />
+                </DropdownMenu>
+            </Dropdown>
         </div>
     </div>
 </template>

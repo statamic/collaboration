@@ -1,3 +1,4 @@
+import '../css/cp.css';
 import Manager from './Manager';
 import StatusBar from './StatusBar.vue';
 import BlockingNotification from './BlockingNotification.vue';
