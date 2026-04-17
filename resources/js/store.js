@@ -1,14 +1,30 @@
+const SCHEMA_VERSION = 1;
+const KEY_PREFIX = 'collaboration.chat.';
+const READ_SUFFIX = '.lastReadAt';
+const KEY_RE = /^collaboration\.chat\.(.+?)(\.lastReadAt)?$/;
+
 const historyLimit = () => {
     return Statamic.$config.get('collaboration.chat.history_limit') || 100;
 };
 
-const storageKey = (channelName) => `collaboration.chat.${channelName}`;
-const readKey = (channelName) => `collaboration.chat.${channelName}.lastReadAt`;
+const retentionMs = () => {
+    const days = Statamic.$config.get('collaboration.chat.retention_days') ?? 30;
+    return days * 24 * 60 * 60 * 1000;
+};
+
+const storageKey = (channelName) => `${KEY_PREFIX}${channelName}`;
+const readKey = (channelName) => `${KEY_PREFIX}${channelName}${READ_SUFFIX}`;
 
 function loadFromStorage(channelName) {
     try {
         const raw = localStorage.getItem(storageKey(channelName));
-        return raw ? JSON.parse(raw) : [];
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.v === SCHEMA_VERSION && Array.isArray(parsed.messages)) {
+            return parsed.messages;
+        }
+        // Unknown / legacy shape — drop it rather than risk rendering bad data.
+        return [];
     } catch (e) {
         return [];
     }
@@ -16,7 +32,10 @@ function loadFromStorage(channelName) {
 
 function saveToStorage(channelName, messages) {
     try {
-        localStorage.setItem(storageKey(channelName), JSON.stringify(messages));
+        localStorage.setItem(
+            storageKey(channelName),
+            JSON.stringify({ v: SCHEMA_VERSION, messages })
+        );
     } catch (e) {
         // Quota exceeded or storage disabled — non-fatal.
     }
@@ -35,7 +54,63 @@ function saveLastReadAt(channelName, ts) {
     }
 }
 
+function pruneStaleChannels(currentChannelName) {
+    try {
+        const cutoff = Date.now() - retentionMs();
+        const channels = {};
+
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (!key) continue;
+            const match = key.match(KEY_RE);
+            if (!match) continue;
+            const [, channel, readSuffix] = match;
+            if (!channels[channel]) channels[channel] = {};
+            if (readSuffix) channels[channel].readKey = key;
+            else channels[channel].msgKey = key;
+        }
+
+        Object.entries(channels).forEach(([channel, keys]) => {
+            if (channel === currentChannelName) return;
+
+            let latestActivity = 0;
+            if (keys.readKey) {
+                const ts = parseInt(localStorage.getItem(keys.readKey), 10);
+                if (!isNaN(ts)) latestActivity = Math.max(latestActivity, ts);
+            }
+            if (keys.msgKey) {
+                try {
+                    const parsed = JSON.parse(localStorage.getItem(keys.msgKey));
+                    const msgs = parsed && Array.isArray(parsed.messages)
+                        ? parsed.messages
+                        : Array.isArray(parsed) ? parsed : [];
+                    const last = msgs[msgs.length - 1];
+                    if (last && typeof last.ts === 'number') {
+                        latestActivity = Math.max(latestActivity, last.ts);
+                    }
+                } catch (e) {
+                    // malformed — treat as stale
+                }
+            }
+
+            if (latestActivity < cutoff) {
+                if (keys.readKey) localStorage.removeItem(keys.readKey);
+                if (keys.msgKey) localStorage.removeItem(keys.msgKey);
+            }
+        });
+    } catch (e) {
+        // non-fatal
+    }
+}
+
+let hasPruned = false;
+
 export function useCollaborationStore(channelName) {
+    if (!hasPruned) {
+        pruneStaleChannels(channelName);
+        hasPruned = true;
+    }
+
     const useStore = Statamic.$pinia.defineStore(`collaboration/${channelName}`, {
         state: () => ({
             users: [],
