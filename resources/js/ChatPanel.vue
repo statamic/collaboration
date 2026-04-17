@@ -1,6 +1,6 @@
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue';
-import { Avatar, Button, Stack, Textarea, StackFooter, StackContent, Badge } from '@statamic/cms/ui';
+import { Avatar, Button, Icon, Stack, Textarea, StackFooter, StackContent, Badge } from '@statamic/cms/ui';
 
 import { useCollaborationStore } from './store';
 
@@ -30,28 +30,63 @@ function userFor(msg) {
 const open = ref(false);
 const draft = ref('');
 const scroller = ref(null);
+const lastSeenLength = ref(messages.value.length);
+const newMessagesBelow = ref(0);
 const me = Statamic.user;
 
 watch(open, (isOpen) => {
     if (isOpen) {
         store.markRead();
-        nextTick(() => scrollToBottom());
+        nextTick(() => {
+            scrollToBottom();
+            lastSeenLength.value = messages.value.length;
+            newMessagesBelow.value = 0;
+        });
     }
 });
 
 watch(
     () => messages.value.length,
-    () => {
-        if (open.value) {
-            store.markRead();
-            nextTick(() => scrollToBottom());
-        }
+    (newLen) => {
+        if (!open.value) return;
+        const wasAtBottom = isNearBottom();
+        nextTick(() => {
+            if (wasAtBottom) {
+                scrollToBottom();
+                store.markRead();
+                lastSeenLength.value = newLen;
+                newMessagesBelow.value = 0;
+            } else {
+                newMessagesBelow.value = Math.max(0, newLen - lastSeenLength.value);
+            }
+        });
     }
 );
+
+function isNearBottom(threshold = 40) {
+    const el = scroller.value;
+    if (!el) return true;
+    return el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+}
 
 function scrollToBottom() {
     const el = scroller.value;
     if (el) el.scrollTop = el.scrollHeight;
+}
+
+function onScroll() {
+    if (isNearBottom()) {
+        newMessagesBelow.value = 0;
+        lastSeenLength.value = messages.value.length;
+        if (open.value) store.markRead();
+    }
+}
+
+function jumpToLatest() {
+    scrollToBottom();
+    newMessagesBelow.value = 0;
+    lastSeenLength.value = messages.value.length;
+    store.markRead();
 }
 
 function send() {
@@ -59,7 +94,11 @@ function send() {
     if (!body) return;
     emit('send', body);
     draft.value = '';
-    nextTick(() => scrollToBottom());
+    nextTick(() => {
+        scrollToBottom();
+        lastSeenLength.value = messages.value.length;
+        newMessagesBelow.value = 0;
+    });
 }
 
 function onKeydown(e) {
@@ -173,7 +212,8 @@ function showTime(index) {
 
         <StackContent class="p-2!">
 
-        <div ref="scroller" class="flex h-full flex-col gap-1.5 overflow-y-auto">
+        <div class="relative h-full">
+        <div ref="scroller" class="flex h-full flex-col gap-1.5 overflow-y-auto" @scroll.passive="onScroll">
             <p v-if="!messages.length" class="py-6 px-3 text-center text-sm text-gray-500 dark:text-gray-400">
                 {{ __('Messages are stored only on your device. New users joining the chat won\'t see earlier messages.') }}
             </p>
@@ -221,6 +261,16 @@ function showTime(index) {
                         >{{ formatTime(msg.ts) }}</time></div>
                 </div>
             </div>
+        </div>
+        <button
+            v-if="newMessagesBelow > 0"
+            type="button"
+            class="absolute bottom-2 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-full bg-blue-500 px-3 py-1 text-xs font-medium text-white shadow-md hover:bg-blue-600"
+            @click="jumpToLatest"
+        >
+            <Icon name="arrow-down" class="size-3" />
+            {{ newMessagesBelow > 99 ? '99+' : newMessagesBelow }} {{ newMessagesBelow === 1 ? __('new message') : __('new messages') }}
+        </button>
         </div>
         </StackContent>
         <StackFooter class="px-2! py-1!">
