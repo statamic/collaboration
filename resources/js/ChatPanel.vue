@@ -1,6 +1,6 @@
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue';
-import { Avatar, Button, Icon, Stack, Textarea, StackFooter, StackContent, Badge } from '@statamic/cms/ui';
+import { Avatar, Button, Stack, Textarea, StackFooter, StackContent, Badge } from '@statamic/cms/ui';
 
 import { useCollaborationStore } from './store';
 
@@ -11,7 +11,7 @@ const props = defineProps({
     },
 });
 
-const emit = defineEmits(['send', 'clear']);
+const emit = defineEmits(['send']);
 
 const store = useCollaborationStore(props.channelName);
 const messages = computed(() => store.messages);
@@ -72,7 +72,6 @@ function onKeydown(e) {
 function clear() {
     if (!confirm(__('Clear chat history on this device?'))) return;
     store.clearMessages();
-    emit('clear');
 }
 
 function formatTime(ts) {
