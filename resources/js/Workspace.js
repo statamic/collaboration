@@ -21,6 +21,7 @@ export default class Workspace {
         this.debouncedBroadcastValueChangeFuncsByHandle = {};
         this.debouncedBroadcastMetaChangeFuncsByHandle = {};
         this.focusWatcher = null;
+        this.subscribeTimeout = null;
     }
 
     start() {
@@ -48,6 +49,10 @@ export default class Workspace {
             this.focusWatcher();
             this.focusWatcher = null;
         }
+        if (this.subscribeTimeout) {
+            clearTimeout(this.subscribeTimeout);
+            this.subscribeTimeout = null;
+        }
         this.echo.leave(this.channelName);
     }
 
@@ -58,9 +63,27 @@ export default class Workspace {
         this.debug(`Joining channel "${this.channelName}"`);
         this.channel = this.echo.join(this.channelName);
 
+        const clearSubscribeTimeout = () => {
+            if (this.subscribeTimeout) {
+                clearTimeout(this.subscribeTimeout);
+                this.subscribeTimeout = null;
+            }
+        };
+
+        this.subscribeTimeout = setTimeout(() => {
+            this.debug(`⏳ Still waiting to subscribe to "${this.channelName}" — is your broadcast server running and reachable?`);
+            this.subscribeTimeout = null;
+        }, 5000);
+
         this.channel
-            .subscribed(() => this.debug(`✅ Subscribed to channel "${this.channelName}"`))
-            .error(error => this.debug(`❌ Subscription error on channel "${this.channelName}"`, {error}));
+            .subscribed(() => {
+                clearSubscribeTimeout();
+                this.debug(`✅ Subscribed to channel "${this.channelName}"`);
+            })
+            .error(error => {
+                clearSubscribeTimeout();
+                this.debug(`❌ Subscription error on channel "${this.channelName}"`, {error});
+            });
 
         this.channel.here(users => {
             this.initializeValueWatcher();
