@@ -72,6 +72,7 @@ export default class Workspace {
         if (this.channelName) {
             this.echo.leave(this.channelName);
         }
+        Object.values(this.container.fieldFocus.value).forEach(({ user }) => this.blur(user));
         this.initialStateUpdated = false;
         this.lastValues = {};
         this.lastMetaValues = {};
