@@ -3,6 +3,7 @@ import { debounce } from '@statamic/cms';
 import buddyIn from '../audio/buddy-in.wav'
 import buddyOut from '../audio/buddy-out.wav'
 import { useCollaborationStore } from './store';
+import { debug, error } from './logger';
 
 export default class Workspace {
 
@@ -60,7 +61,7 @@ export default class Workspace {
         const reference = this.container.reference.replaceAll('::', '.');
         this.channelName = `${reference}.${this.container.site.replaceAll('.', '_')}`;
 
-        this.debug(`Joining channel "${this.channelName}"`);
+        debug(`Joining channel "${this.channelName}"`);
         this.channel = this.echo.join(this.channelName);
 
         const clearSubscribeTimeout = () => {
@@ -71,18 +72,18 @@ export default class Workspace {
         };
 
         this.subscribeTimeout = setTimeout(() => {
-            this.debug(`⏳ Still waiting to subscribe to "${this.channelName}" — is your broadcast server running and reachable?`);
+            debug(`⏳ Still waiting to subscribe to "${this.channelName}" — is your broadcast server running and reachable?`);
             this.subscribeTimeout = null;
         }, 5000);
 
         this.channel
             .subscribed(() => {
                 clearSubscribeTimeout();
-                this.debug(`✅ Subscribed to channel "${this.channelName}"`);
+                debug(`✅ Subscribed to channel "${this.channelName}"`);
             })
-            .error(error => {
+            .error(e => {
                 clearSubscribeTimeout();
-                this.error(`❌ Subscription error on channel "${this.channelName}"`, {error});
+                error(`❌ Subscription error on channel "${this.channelName}"`, {error: e});
             });
 
         this.channel.here(users => {
@@ -125,7 +126,7 @@ export default class Workspace {
 
         this.listenForWhisper(`initialize-state-for-${this.user.id}`, payload => {
             if (this.initialStateUpdated) return;
-            this.debug('✅ Applying broadcasted state change', payload);
+            debug('✅ Applying broadcasted state change', payload);
             this.container.setValues(payload.values);
             this.lastValues = clone(payload.values);
             const restoredMeta = this.restoreEntireMetaPayload(payload.meta || {});
@@ -136,17 +137,17 @@ export default class Workspace {
         });
 
         this.listenForWhisper('focus', ({ user, handle }) => {
-            this.debug(`Heard that user has changed focus`, { user, handle });
+            debug(`Heard that user has changed focus`, { user, handle });
             this.focus(user, handle);
         });
 
         this.listenForWhisper('blur', ({ user, handle }) => {
-            this.debug(`Heard that user has blurred`, { user, handle });
+            debug(`Heard that user has blurred`, { user, handle });
             this.blur(user, handle);
         });
 
         this.listenForWhisper('force-unlock', ({ targetUser, originUser }) => {
-            this.debug(`Heard that user has requested another be unlocked`, { targetUser, originUser });
+            debug(`Heard that user has requested another be unlocked`, { targetUser, originUser });
 
             if (targetUser.id !== this.user.id) return;
 
@@ -290,12 +291,12 @@ export default class Workspace {
     }
 
     rememberValueChange(handle, value) {
-        this.debug('Remembering value change', { handle, value });
+        debug('Remembering value change', { handle, value });
         this.lastValues[handle] = clone(value);
     }
 
     rememberMetaChange(handle, value) {
-        this.debug('Remembering meta change', { handle, value });
+        debug('Remembering meta change', { handle, value });
         this.lastMetaValues[handle] = clone(value);
     }
 
@@ -380,24 +381,16 @@ export default class Workspace {
     }
 
     applyBroadcastedValueChange(payload) {
-        this.debug('✅ Applying broadcasted value change', payload);
+        debug('✅ Applying broadcasted value change', payload);
         this.rememberValueChange(payload.handle, payload.value);
         this.container.setFieldValue(payload.handle, payload.value);
     }
 
     applyBroadcastedMetaChange(payload) {
-        this.debug('✅ Applying broadcasted meta change', payload);
+        debug('✅ Applying broadcasted meta change', payload);
         let value = { ...this.lastMetaValues[payload.handle], ...payload.value };
         this.rememberMetaChange(payload.handle, value);
         this.container.setFieldMeta(payload.handle, value);
-    }
-
-    debug(message, args) {
-        console.log('[Collaboration]', message, {...args});
-    }
-
-    error(message, args) {
-        console.error('[Collaboration]', message, {...args});
     }
 
     isAlone() {
@@ -412,7 +405,7 @@ export default class Workspace {
         const msgId = Math.random() + '';
 
         if (str.length < chunkSize) {
-            this.debug(`📣 Broadcasting "${event}"`, payload);
+            debug(`📣 Broadcasting "${event}"`, payload);
             this.channel.whisper(event, payload);
             return;
         }
@@ -426,7 +419,7 @@ export default class Workspace {
                 chunk: str.substr(i * chunkSize, chunkSize),
                 final: chunkSize * (i + 1) >= str.length
             };
-            this.debug(`📣 Broadcasting "${event}"`, chunk);
+            debug(`📣 Broadcasting "${event}"`, chunk);
             this.channel.whisper(event, chunk);
         }
     }
