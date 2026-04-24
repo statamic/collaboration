@@ -22,22 +22,29 @@ export default class Workspace {
         this.debouncedBroadcastValueChangeFuncsByHandle = {};
         this.debouncedBroadcastMetaChangeFuncsByHandle = {};
         this.focusWatcher = null;
+        this.containerWatcher = null;
+        this.statusBarComponent = null;
         this.subscribeTimeout = null;
     }
 
     start() {
         if (this.started) return;
 
-        this.initializeEcho();
-        this.initializeStore();
-        this.initializeValuesAndMeta();
         this.initializeHooks();
-        this.initializeStatusBar();
-        this.initializeFocusBlur();
+        this.initializeContainerWatcher();
+        this.startChannel();
         this.started = true;
     }
 
-    destroy() {
+    startChannel() {
+        this.initializeEcho();
+        this.initializeStore();
+        this.initializeValuesAndMeta();
+        this.initializeStatusBar();
+        this.initializeFocusBlur();
+    }
+
+    stopChannel() {
         if (this.valuesWatcher) {
             this.valuesWatcher();
             this.valuesWatcher = null;
@@ -54,36 +61,72 @@ export default class Workspace {
             clearTimeout(this.subscribeTimeout);
             this.subscribeTimeout = null;
         }
-        this.echo.leave(this.channelName);
+        if (this.statusBarComponent) {
+            this.statusBarComponent.destroy();
+            this.statusBarComponent = null;
+        }
+        Object.values(this.debouncedBroadcastValueChangeFuncsByHandle).forEach(f => f.cancel());
+        Object.values(this.debouncedBroadcastMetaChangeFuncsByHandle).forEach(f => f.cancel());
+        this.debouncedBroadcastValueChangeFuncsByHandle = {};
+        this.debouncedBroadcastMetaChangeFuncsByHandle = {};
+        if (this.channelName) {
+            this.echo.leave(this.channelName);
+        }
+        Object.values(this.container.fieldFocus.value).forEach(({ user }) => this.blur(user));
+        this.initialStateUpdated = false;
+        this.lastValues = {};
+        this.lastMetaValues = {};
+    }
+
+    restart() {
+        debug('🔄 Site changed — restarting workspace');
+        this.stopChannel();
+        this.startChannel();
+    }
+
+    destroy() {
+        this.stopChannel();
+        if (this.containerWatcher) {
+            this.containerWatcher();
+            this.containerWatcher = null;
+        }
+    }
+
+    initializeContainerWatcher() {
+        this.containerWatcher = watch(
+            () => [this.container.reference.value, this.container.site.value],
+            () => this.restart(),
+            { flush: 'sync' },
+        );
     }
 
     initializeEcho() {
-        const reference = this.container.reference.replaceAll('::', '.');
-        this.channelName = `${reference}.${this.container.site.replaceAll('.', '_')}`;
+        const reference = this.container.reference.value.replaceAll('::', '.');
+        this.channelName = `${reference}.${this.container.site.value.replaceAll('.', '_')}`;
 
-        debug(`Joining channel "${this.channelName}"`);
-        this.channel = this.echo.join(this.channelName);
+        const channelName = this.channelName;
+        debug(`Joining channel "${channelName}"`);
+        this.channel = this.echo.join(channelName);
+
+        const timeout = setTimeout(() => {
+            debug(`⏳ Still waiting to subscribe to "${channelName}" — is your broadcast server running and reachable?`);
+            if (this.subscribeTimeout === timeout) this.subscribeTimeout = null;
+        }, 5000);
+        this.subscribeTimeout = timeout;
 
         const clearSubscribeTimeout = () => {
-            if (this.subscribeTimeout) {
-                clearTimeout(this.subscribeTimeout);
-                this.subscribeTimeout = null;
-            }
+            clearTimeout(timeout);
+            if (this.subscribeTimeout === timeout) this.subscribeTimeout = null;
         };
-
-        this.subscribeTimeout = setTimeout(() => {
-            debug(`⏳ Still waiting to subscribe to "${this.channelName}" — is your broadcast server running and reachable?`);
-            this.subscribeTimeout = null;
-        }, 5000);
 
         this.channel
             .subscribed(() => {
                 clearSubscribeTimeout();
-                debug(`✅ Subscribed to channel "${this.channelName}"`);
+                debug(`✅ Subscribed to channel "${channelName}"`);
             })
             .error(e => {
                 clearSubscribeTimeout();
-                error(`❌ Subscription error on channel "${this.channelName}"`, {error: e});
+                error(`❌ Subscription error on channel "${channelName}"`, {error: e});
             });
 
         this.channel.here(users => {
@@ -185,13 +228,13 @@ export default class Workspace {
     }
 
     initializeStatusBar() {
-        const component = this.container.pushComponent('CollaborationStatusBar', {
+        this.statusBarComponent = this.container.pushComponent('CollaborationStatusBar', {
             props: {
                 channelName: this.channelName,
             }
         });
 
-        component.on('unlock', (targetUser) => {
+        this.statusBarComponent.on('unlock', (targetUser) => {
             this.whisper('force-unlock', { targetUser, originUser: this.user });
         });
     }
@@ -212,21 +255,21 @@ export default class Workspace {
 
     initializeHooks() {
         Statamic.$hooks.on('entry.saved', (resolve, reject, { reference }) => {
-            if (reference === this.container.reference) {
+            if (reference === this.container.reference.value) {
                 this.whisper('saved', { user: this.user });
             }
             resolve();
         });
 
         Statamic.$hooks.on('entry.published', (resolve, reject, { reference, message }) => {
-            if (reference === this.container.reference) {
+            if (reference === this.container.reference.value) {
                 this.whisper('published', { user: this.user, message });
             }
             resolve();
         });
 
         Statamic.$hooks.on('revision.restored', (resolve, reject, { reference }) => {
-            if (reference !== this.container.reference) return resolve();
+            if (reference !== this.container.reference.value) return resolve();
 
             this.whisper('revision-restored', { user: this.user });
 
