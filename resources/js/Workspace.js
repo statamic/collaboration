@@ -54,7 +54,13 @@ export default class Workspace {
     initializeEcho() {
         const reference = this.container.reference.replaceAll('::', '.');
         this.channelName = `${reference}.${this.container.site.replaceAll('.', '_')}`;
+
+        this.debug(`Joining channel "${this.channelName}"`);
         this.channel = this.echo.join(this.channelName);
+
+        this.channel
+            .subscribed(() => this.debug(`✅ Subscribed to channel "${this.channelName}"`))
+            .error(error => this.debug(`❌ Subscription error on channel "${this.channelName}"`, {error}));
 
         this.channel.here(users => {
             this.initializeValueWatcher();

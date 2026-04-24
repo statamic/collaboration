@@ -12,6 +12,16 @@ Statamic.booting(() => {
 Statamic.$echo.booted(Echo => {
     manager.echo = Echo;
     manager.boot();
+
+    // When using Pusher or Reverb (both pusher-js under the hood), log connection
+    // state transitions to help diagnose why the websocket isn't connecting.
+    // Echo here is Statamic's wrapper; the underlying Laravel Echo is at Echo.echo.
+    const connection = Echo.echo?.connector?.pusher?.connection;
+    if (connection) {
+        console.log('[Collaboration] Connection state:', connection.state);
+        connection.bind('state_change', ({ previous, current }) => console.log(`[Collaboration] Connection state: ${previous} → ${current}`));
+        connection.bind('error', error => console.log('[Collaboration] Connection error:', error));
+    }
 });
 
 Statamic.$events.$on('publish-container-created', container => {
