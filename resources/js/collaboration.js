@@ -26,7 +26,7 @@ Statamic.$echo.booted(Echo => {
 });
 
 Statamic.$events.$on('publish-container-created', container => {
-    if (!container.reference) return;
+    if (!container.reference.value) return;
     manager.addWorkspace(container);
 });
 
