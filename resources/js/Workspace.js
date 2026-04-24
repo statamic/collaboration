@@ -82,7 +82,7 @@ export default class Workspace {
             })
             .error(error => {
                 clearSubscribeTimeout();
-                this.debug(`❌ Subscription error on channel "${this.channelName}"`, {error});
+                this.error(`❌ Subscription error on channel "${this.channelName}"`, {error});
             });
 
         this.channel.here(users => {
@@ -394,6 +394,10 @@ export default class Workspace {
 
     debug(message, args) {
         console.log('[Collaboration]', message, {...args});
+    }
+
+    error(message, args) {
+        console.error('[Collaboration]', message, {...args});
     }
 
     isAlone() {

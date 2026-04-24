@@ -20,7 +20,7 @@ Statamic.$echo.booted(Echo => {
     if (connection) {
         console.log('[Collaboration] Connection state:', connection.state);
         connection.bind('state_change', ({ previous, current }) => console.log(`[Collaboration] Connection state: ${previous} → ${current}`));
-        connection.bind('error', error => console.log('[Collaboration] Connection error:', error));
+        connection.bind('error', error => console.error('[Collaboration] Connection error:', error));
     }
 });
 
