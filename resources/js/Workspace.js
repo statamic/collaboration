@@ -104,29 +104,29 @@ export default class Workspace {
         const reference = this.container.reference.value.replaceAll('::', '.');
         this.channelName = `${reference}.${this.container.site.value.replaceAll('.', '_')}`;
 
-        debug(`Joining channel "${this.channelName}"`);
-        this.channel = this.echo.join(this.channelName);
+        const channelName = this.channelName;
+        debug(`Joining channel "${channelName}"`);
+        this.channel = this.echo.join(channelName);
+
+        const timeout = setTimeout(() => {
+            debug(`⏳ Still waiting to subscribe to "${channelName}" — is your broadcast server running and reachable?`);
+            if (this.subscribeTimeout === timeout) this.subscribeTimeout = null;
+        }, 5000);
+        this.subscribeTimeout = timeout;
 
         const clearSubscribeTimeout = () => {
-            if (this.subscribeTimeout) {
-                clearTimeout(this.subscribeTimeout);
-                this.subscribeTimeout = null;
-            }
+            clearTimeout(timeout);
+            if (this.subscribeTimeout === timeout) this.subscribeTimeout = null;
         };
-
-        this.subscribeTimeout = setTimeout(() => {
-            debug(`⏳ Still waiting to subscribe to "${this.channelName}" — is your broadcast server running and reachable?`);
-            this.subscribeTimeout = null;
-        }, 5000);
 
         this.channel
             .subscribed(() => {
                 clearSubscribeTimeout();
-                debug(`✅ Subscribed to channel "${this.channelName}"`);
+                debug(`✅ Subscribed to channel "${channelName}"`);
             })
             .error(e => {
                 clearSubscribeTimeout();
-                error(`❌ Subscription error on channel "${this.channelName}"`, {error: e});
+                error(`❌ Subscription error on channel "${channelName}"`, {error: e});
             });
 
         this.channel.here(users => {
