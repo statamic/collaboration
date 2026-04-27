@@ -1,5 +1,14 @@
 # Release Notes
 
+## 2.0.1 (2026-04-27)
+
+### What's fixed
+- Better UI/UX. [#112](https://github.com/statamic/collaboration/pull/112) by @jackmcdade
+- Improve debugging. [#114](https://github.com/statamic/collaboration/pull/114) by @jasonvarga
+- Fix multi-site support. [#115](https://github.com/statamic/collaboration/pull/115) by @jasonvarga
+
+
+
 ## 2.0.0 (2026-04-16)
 
 ### What's new
