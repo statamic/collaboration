@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref, watch, onUnmounted } from 'vue';
 import { Icon, Dropdown, DropdownMenu, DropdownItem, Avatar } from '@statamic/cms/ui';
 import { useCollaborationStore } from './store';
 import ChatPanel from './ChatPanel.vue';
@@ -20,13 +20,31 @@ const chatEnabled = computed(() => Statamic.$config.get('collaboration.chat.enab
 const hasChatHistory = computed(() => store.messages.length > 0);
 const showChat = computed(() => chatEnabled.value && !connecting.value && (users.value.length > 1 || hasChatHistory.value));
 const visible = computed(() => connecting.value || users.value.length > 1 || showChat.value);
+const takingLong = ref(false);
+let takingLongTimer = null;
+
+watch(connecting, (isConnecting) => {
+    clearTimeout(takingLongTimer);
+    if (isConnecting) {
+        takingLongTimer = setTimeout(() => takingLong.value = true, 5000);
+    } else {
+        takingLong.value = false;
+    }
+}, { immediate: true });
+
+onUnmounted(() => clearTimeout(takingLongTimer));
 </script>
 
 <template>
-    <div class="collaboration-status-bar relative -top-[1.25rem] flex items-center gap-3" v-if="visible">
+    <div class="collaboration-status-bar relative -top-5 flex items-center gap-3" v-if="visible">
         <div v-if="connecting" class="flex items-center text-sm text-gray-500 dark:text-gray-400">
             <Icon name="loading" class="me-1.5 size-3.5 animate-spin" />
-            {{ __('Attempting websocket connection...') }}
+            <template v-if="takingLong">
+                {{ __('Connection taking longer than expected. Check the browser console for details.') }}
+            </template>
+            <template v-else>
+                {{ __('Attempting websocket connection...') }}
+            </template>
         </div>
         <div v-if="users.length > 1" class="flex items-center -space-x-2">
             <Dropdown v-for="(user, index) in users" :key="user.id">
