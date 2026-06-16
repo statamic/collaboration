@@ -102,7 +102,10 @@ export default class Workspace {
 
     initializeEcho() {
         const reference = this.container.reference.value.replaceAll('::', '.');
-        this.channelName = `${reference}.${this.container.site.value.replaceAll('.', '_')}`;
+        // Assets aren't site-scoped, so their publish container has no site.
+        // Fall back to a site-less channel instead of throwing on `.replaceAll`.
+        const site = this.container.site?.value;
+        this.channelName = site ? `${reference}.${site.replaceAll('.', '_')}` : reference;
 
         const channelName = this.channelName;
         debug(`Joining channel "${channelName}"`);
