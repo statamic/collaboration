@@ -19,6 +19,19 @@ class ServiceProvider extends AddonServiceProvider
     {
         Statamic::provideToScript(['collaboration' => config('collaboration')]);
 
+        Broadcast::channel('users.delay', function ($user) {
+            $user = User::fromUser($user);
+
+            return [
+                'name' => $user->name(),
+                'id' => $user->id(),
+                'title' => $user->title(),
+                'email' => $user->email(),
+                'avatar' => $user->avatar(),
+                'initials' => $user->initials(),
+            ];
+        }, ['guards' => [config('statamic.users.guards.cp')]]);
+
         Broadcast::channel('entry.{id}.{site}', function ($user, $id, $site) {
             $user = User::fromUser($user);
 
