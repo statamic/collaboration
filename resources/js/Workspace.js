@@ -25,14 +25,17 @@ export default class Workspace {
         this.containerWatcher = null;
         this.statusBarComponent = null;
         this.subscribeTimeout = null;
+
+        this.eventsQueue = [];
+
     }
 
     start() {
         if (this.started) return;
 
-        this.initializeHooks();
         this.initializeContainerWatcher();
         this.startChannel();
+        this.initializeHooks();
         this.started = true;
     }
 
@@ -121,6 +124,10 @@ export default class Workspace {
 
         this.channel
             .subscribed(() => {
+                for (const event of this.eventsQueue) {
+                    this.whisper( event.event, event.payload, true );
+                }
+
                 clearSubscribeTimeout();
                 debug(`✅ Subscribed to channel "${channelName}"`);
             })
@@ -440,12 +447,19 @@ export default class Workspace {
         return this.store.users.length === 1;
     }
 
-    whisper(event, payload) {
+    whisper(event, payload, force = false) {
         if (this.isAlone()) return;
 
         const chunkSize = 2500;
         const str = JSON.stringify(payload);
         const msgId = Math.random() + '';
+        const isChannelSubscribed = this.subscribeTimeout === null;
+
+        if(!isChannelSubscribed && !force) {
+            debug(`⏳ Broadcast adding to queue "${event}"`, payload);
+            this.eventsQueue.push({ event, payload });
+            return;
+        }
 
         if (str.length < chunkSize) {
             debug(`📣 Broadcasting "${event}"`, payload);
