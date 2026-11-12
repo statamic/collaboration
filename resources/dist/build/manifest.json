@@ -1,0 +1,23 @@
+{
+  "resources/audio/buddy-in.wav": {
+    "file": "assets/buddy-in-B0hyoYYq.wav",
+    "src": "resources/audio/buddy-in.wav"
+  },
+  "resources/audio/buddy-out.wav": {
+    "file": "assets/buddy-out-DnN0ABe_.wav",
+    "src": "resources/audio/buddy-out.wav"
+  },
+  "resources/js/collaboration.js": {
+    "file": "assets/collaboration-B9w4xD-Q.js",
+    "name": "collaboration",
+    "src": "resources/js/collaboration.js",
+    "isEntry": true,
+    "css": [
+      "assets/collaboration-Bobev4u2.css"
+    ],
+    "assets": [
+      "assets/buddy-in-B0hyoYYq.wav",
+      "assets/buddy-out-DnN0ABe_.wav"
+    ]
+  }
+}
