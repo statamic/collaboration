@@ -1,5 +1,12 @@
 # Release Notes
 
+## 2.0.2 (2026-11-12)
+
+### What's fixed
+- Authorize entry broadcast channel. [#135](https://github.com/statamic/collaboration/pull/135) by @jasonvarga
+
+
+
 ## 2.0.1 (2026-04-27)
 
 ### What's fixed
