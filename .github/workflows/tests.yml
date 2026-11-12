@@ -46,3 +46,15 @@ jobs:
 
       - name: Run PHPUnit
         run: vendor/bin/phpunit
+
+  php_tests_result:
+    name: PHP tests
+    runs-on: ubuntu-latest
+    needs: [php_tests]
+    if: always()
+    permissions: {}
+
+    steps:
+      - name: Fail if any matrix job failed
+        if: needs.php_tests.result != 'success' && needs.php_tests.result != 'skipped'
+        run: exit 1
