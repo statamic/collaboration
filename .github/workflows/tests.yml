@@ -1,0 +1,60 @@
+name: Test Suite
+
+on: # zizmor: ignore[concurrency-limits]
+  push:
+    branches:
+      - master
+      - '*.x'
+  pull_request:
+
+permissions: {}
+
+jobs:
+  php_tests:
+    if: "!contains(github.event.head_commit.message, 'changelog')"
+
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        php: [8.3, 8.4, 8.5]
+        laravel: [12.*, 13.*]
+        stability: [prefer-lowest, prefer-stable]
+        os: [ubuntu-latest]
+
+    name: P${{ matrix.php }} - L${{ matrix.laravel }} - ${{ matrix.stability }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, soap, intl, gd, exif, iconv, imagick
+
+      - name: Install dependencies
+        env:
+          LARAVEL: ${{ matrix.laravel }}
+          STABILITY: ${{ matrix.stability }}
+        run: |
+          composer require "illuminate/contracts:$LARAVEL" --no-interaction --no-update
+          composer update --$STABILITY --prefer-dist --no-interaction --no-suggest
+
+      - name: Run PHPUnit
+        run: vendor/bin/phpunit
+
+  php_tests_result:
+    name: PHP tests
+    runs-on: ubuntu-latest
+    needs: [php_tests]
+    if: always()
+    permissions: {}
+
+    steps:
+      - name: Fail if any matrix job failed
+        if: needs.php_tests.result != 'success' && needs.php_tests.result != 'skipped'
+        run: exit 1
