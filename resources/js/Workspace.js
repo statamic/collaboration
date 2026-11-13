@@ -2,6 +2,8 @@ import { watch } from 'vue';
 import { debounce } from '@statamic/cms';
 import buddyIn from '../audio/buddy-in.wav'
 import buddyOut from '../audio/buddy-out.wav'
+import messageSend from '../audio/message-send.wav'
+import messageReceive from '../audio/message-receive.wav'
 import { useCollaborationStore } from './store';
 import { debug, error } from './logger';
 
@@ -214,6 +216,32 @@ export default class Workspace {
             this.destroy(); // Stop listening to anything else.
         });
 
+        this.listenForWhisper('chat-message', (message) => {
+            this.debug('💬 Received chat message', message);
+            // Don't trust the sender's user blob — resolve from presence. Drops any
+            // whisper forging an id that isn't currently on the channel.
+            const sender = this.store.users.find(u => String(u.id) === String(message.userId));
+            if (!sender) {
+                this.debug('⚠️ Dropping chat message from unknown sender', message);
+                return;
+            }
+            this.store.addMessage({
+                id: message.id,
+                body: message.body,
+                ts: message.ts,
+                user: {
+                    id: sender.id,
+                    name: sender.name,
+                    avatar: sender.avatar,
+                    initials: sender.initials,
+                },
+            });
+
+            if (Statamic.$config.get('collaboration.sound_effects')) {
+                this.playAudio('message-receive');
+            }
+        });
+
         this.listenForWhisper('revision-restored', ({ user }) => {
             Statamic.$toast.success(`Revision restored by ${user.name}.`);
             Statamic.$components.append('CollaborationBlockingNotification', {
@@ -237,6 +265,41 @@ export default class Workspace {
         this.statusBarComponent.on('unlock', (targetUser) => {
             this.whisper('force-unlock', { targetUser, originUser: this.user });
         });
+
+        component.on('chat', (body) => {
+            this.sendChatMessage(body);
+        });
+    }
+
+    sendChatMessage(body) {
+        const text = String(body || '').trim();
+        if (!text) return;
+
+        const id = (crypto && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+        const ts = Date.now();
+
+        // Locally persist with a full user snapshot so history still renders
+        // after we (or our peers) leave the channel.
+        this.store.addMessage({
+            id,
+            body: text,
+            ts,
+            user: {
+                id: this.user.id,
+                name: this.user.name,
+                avatar: this.user.avatar,
+                initials: this.user.initials,
+            },
+        });
+        this.store.markRead();
+
+        // Wire payload carries only the sender's id — recipients resolve the
+        // rest from the presence channel to block casual impersonation.
+        this.whisper('chat-message', { id, body: text, ts, userId: this.user.id });
+
+        if (Statamic.$config.get('collaboration.sound_effects')) {
+            this.playAudio('message-send');
+        }
     }
 
     initializeFocusBlur() {
@@ -500,6 +563,10 @@ export default class Workspace {
             return buddyIn;
         } else if (file === 'buddy-out') {
             return buddyOut;
+        } else if (file === 'message-send') {
+            return messageSend;
+        } else if (file === 'message-receive') {
+            return messageReceive;
         }
 
         console.error('audio not found');
